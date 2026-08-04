@@ -26,3 +26,13 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+.vercel
+
+# Node / Next.js
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+vercel-deployment/.next/
+vercel-deployment/node_modules/
+vercel-deployment/package-lock.json

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Leaf, Shield, Users, ArrowRight, Download, FileText, BarChart2, Cpu, Globe } from "lucide-react";
 import { MultiLLM } from "@/lib/multi-llm";
-import { useToast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import type { SustainabilityMetrics } from "@/types/multi-llm";
 
 export default function HomePage() {
@@ -14,7 +14,6 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   
   const queryClient = useQueryClient();
-  const toast = useToast();
 
   const multiLLM = new MultiLLM();
 
@@ -40,7 +39,7 @@ export default function HomePage() {
       queryClient.invalidateQueries(['user-stats']);
       
     } catch (error) {
-      toast.error(`Query failed: ${error.message}`, { id: toastId });
+      toast.error(`Query failed: ${(error as Error).message}`, { id: toastId });
       setResult(null);
     } finally {
       setIsLoading(false);

@@ -17,7 +17,6 @@
     "next": "14.2.3",
     "react": "18.3.0",
     "react-dom": "18.3.0",
-    "@appwrite.io/node": "15.0.2",
     "clsx": "^1.2.1",
     "tailwind-merge": "^1.14.0",
     "date-fns": "^2.30.0",
@@ -25,8 +24,7 @@
     "lucide-react": "^0.263.1",
     "axios": "^1.6.2",
     "swr": "^2.0.1",
-    "react-query": "^3.39.7",
-    "lucide-react": "^0.263.1",
+    "react-query": "^3.39.3",
     "react-hot-toast": "^2.4.1",
     "sharp": "^0.33.2",
     "jszip": "^3.10.1",
@@ -43,7 +41,6 @@
     "@types/node": "^20.10.8",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
-    "sass": "^1.69.5",
-    "@appwrite.io/cli": "^15.0.2"
+    "sass": "^1.69.5"
   }
 }

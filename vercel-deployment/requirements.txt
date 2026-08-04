@@ -1,0 +1,85 @@
+appwrite==9.0.1
+openai>=1.0.0
+httpx>=0.24.0
+streamlit>=1.30.0
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+REQUIRE_EOF
+
+# Create deployment script
+cat > deploy.sh << 'DEPLOY_EOF'
+#!/bin/bash
+# Multi LLM SaaS Deployment Script
+set -e
+
+echo "🎯 Deploying Multi LLM SaaS Platform"
+
+# Step 1: Initialize and configure Git
+git init
+git config user.name "imredavid64-glitch"
+git config user.email "imredavid64-glitch@users.noreply.github.com"
+
+# Step 2: Create .gitignore
+cat > .gitignore << 'GITIGNORE_EOF'
+# Secrets
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Node
+node_modules/
+.next/
+
+# Runtime artifacts
+chat_history.json
+thinking_temp.json
+*.log
+
+# Build
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+GITIGNORE_EOF
+
+# Step 3: Add all files
+git add -A
+
+# Step 4: Commit
+git commit -m "🎉 Initial Multi LLM SaaS Platform
+
+- Multi LLM Provider Stack (OpenRouter, Gemini, Mistral)
+- EcoBrain Learning Engine with sustainability metrics
+- Multi-platform runtime: Python, JavaScript, Java, C++
+- Vercel SaaS platform deployment
+- Carbon-neutral AI operations
+- Zero-cost, zero-infrastructure platform"
+
+# Step 5: Add remote
+git remote add origin https://github.com/imredavid64-glitch/MultiLLM-AI.git
+
+# Step 6: Push to GitHub
+git push -u origin main
+
+# Step 7: Deploy to Vercel
+vercel --prod --yes
+
+echo "✅ Deployment complete!"
+echo "Visit: https://multillm.vercel.app"
+DEPLOY_EOF
+chmod +x deploy.sh
+
+echo "✅ Created deployment configuration files"
+ls -la

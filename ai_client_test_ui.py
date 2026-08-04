@@ -12,7 +12,6 @@ from ai_client import (
     SourceChunk,
     SourceIndex,
     bias_score,
-    build_ensemble_answer,
     build_provider_stack,
     detect_sensitive_hits,
     format_provider_status,
@@ -36,6 +35,10 @@ def init_state() -> None:
         st.session_state.test_log: List[Dict] = []
     if "generation_config" not in st.session_state:
         st.session_state.generation_config = GenerationConfig()
+    if "tb_bot_count" not in st.session_state:
+        st.session_state.tb_bot_count = 4
+    if "tb_privacy" not in st.session_state:
+        st.session_state.tb_privacy = True
 
 
 def percentile(values: List[float], q: float) -> float:
