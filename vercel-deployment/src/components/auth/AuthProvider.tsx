@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User } from "@/lib/appwrite/types";
-import { account, ID } from "@/lib/appwrite/client";
+import { account } from "@/lib/appwrite/client";
+import { ID } from "@/lib/appwrite/client";
 
 interface AuthContextType {
   user: User | null;

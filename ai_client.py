@@ -634,6 +634,14 @@ class MistralProvider:
 def build_provider_stack() -> List[ChatProvider]:
     providers: List[ChatProvider] = []
 
+    try:
+        from local_models import LocalTransformerProvider
+
+        if LocalTransformerProvider().size():
+            providers.append(LocalTransformerProvider())
+    except Exception:
+        pass
+
     openai_keys = load_keys_from_env(
         multi_env="OPENAI_API_KEYS",
         single_env="OPENAI_API_KEY",
@@ -953,6 +961,14 @@ def build_ensemble_answer(
                 s_score = source_support_score(text, sources)
                 b_score = bias_score(text)
                 c_score = clarity_score(text)
+                try:
+                    from local_models import blend_score
+
+                    s_score, b_score, c_score = blend_score(
+                        text, sources, s_score, b_score, c_score
+                    )
+                except Exception:
+                    pass
                 total = (0.50 * s_score) + (0.25 * b_score) + (0.25 * c_score)
             except Exception as exc:
                 text = f"(bot failed: {exc})"
@@ -981,6 +997,11 @@ def build_ensemble_answer(
 
     top_candidates = successful[:3]
     synthesis_provider = providers[top_candidates[0].provider_index]
+    for candidate in top_candidates:
+        provider = providers[candidate.provider_index]
+        if provider.name != "Local TinyGPT (from scratch)":
+            synthesis_provider = provider
+            break
 
     synthesis_prompt = (
         "You are the final judge. Merge the best parts of candidate answers into one superior response.\n"

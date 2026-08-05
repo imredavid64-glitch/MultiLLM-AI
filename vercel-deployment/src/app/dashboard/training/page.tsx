@@ -9,37 +9,49 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 const mockTrainingJobs = [
   {
     id: "job_1",
-    name: "Distill Gemma-7B",
+    name: "TinyGPT ensemble-generator (from scratch)",
+    status: "completed" as const,
+    progress: 100,
+    baseModel: "scratch-tinygpt",
+    epochs: 30,
+    learningRate: 0.003,
+    createdAt: "2026-08-05T00:00:00Z",
+    completedAt: "2026-08-05T00:21:00Z",
+    modelPath: "/models/ensemble-generator",
+  },
+  {
+    id: "job_2",
+    name: "TinyScorer answer-quality regressor",
+    status: "completed" as const,
+    progress: 100,
+    baseModel: "scratch-tinygpt",
+    epochs: 40,
+    learningRate: 0.003,
+    createdAt: "2026-08-05T00:22:00Z",
+    completedAt: "2026-08-05T00:23:30Z",
+    modelPath: "/models/ensemble-scorer",
+  },
+  {
+    id: "job_3",
+    name: "Retrain on user corpus",
+    status: "pending" as const,
+    progress: 0,
+    baseModel: "scratch-tinygpt",
+    epochs: 30,
+    learningRate: 0.003,
+    createdAt: "2026-08-05T09:00:00Z",
+    estimatedCompletion: "2026-08-05T09:30:00Z",
+  },
+  {
+    id: "job_4",
+    name: "Fine-tune Gemma-7B on custom data",
     status: "training" as const,
     progress: 45,
     baseModel: "gemma-2b",
     epochs: 3,
     learningRate: 0.0002,
-    createdAt: "2024-01-10T00:00:00Z",
-    estimatedCompletion: "2024-01-15T12:00:00Z",
-  },
-  {
-    id: "job_2",
-    name: "Fine-tune Qwen-1.8B",
-    status: "completed" as const,
-    progress: 100,
-    baseModel: "qwen-1.8b",
-    epochs: 5,
-    learningRate: 0.0001,
-    createdAt: "2024-01-01T00:00:00Z",
-    completedAt: "2024-01-05T18:30:00Z",
-    modelPath: "/models/qwen-1.8b-finetuned",
-  },
-  {
-    id: "job_3",
-    name: "Custom Hybrid Model",
-    status: "pending" as const,
-    progress: 0,
-    baseModel: "meta-llama/llama-3-8b",
-    epochs: 10,
-    learningRate: 0.0005,
-    createdAt: "2024-01-16T10:00:00Z",
-    estimatedCompletion: "2024-01-25T10:00:00Z",
+    createdAt: "2026-08-05T00:00:00Z",
+    estimatedCompletion: "2026-08-05T12:00:00Z",
   },
 ];
 
@@ -47,16 +59,16 @@ export default function TrainingPage() {
   const { user } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newJobName, setNewJobName] = useState("");
-  const [newJobBaseModel, setNewJobBaseModel] = useState("gemma-2b");
+  const [newJobBaseModel, setNewJobBaseModel] = useState("scratch-tinygpt");
   const [newJobEpochs, setNewJobEpochs] = useState(3);
   const [newJobLearningRate, setNewJobLearningRate] = useState(0.0002);
 
   const baseModels = [
+    { id: "scratch-tinygpt", name: "TinyGPT (scratch)", params: "0.5M", company: "MultiLLM" },
+    { id: "ensemble-generator", name: "Ensemble Generator", params: "0.5M", company: "MultiLLM" },
+    { id: "ensemble-scorer", name: "Answer Scorer", params: "0.3M", company: "MultiLLM" },
     { id: "gemma-2b", name: "Gemma 2B", params: "2B", company: "Google" },
-    { id: "qwen-1.8b", name: "Qwen 1.8B", params: "1.8B", company: "Alibaba" },
     { id: "mistral-7b", name: "Mistral 7B", params: "7B", company: "Mistral AI" },
-    { id: "llama-3-8b", name: "Llama 3 8B", params: "8B", company: "Meta" },
-    { id: "meta-llama/llama-3-70b", name: "Llama 3 70B", params: "70B", company: "Meta" },
   ];
 
   const handleCreateJob = () => {
@@ -252,7 +264,7 @@ export default function TrainingPage() {
                       <div>
                         <div className="text-slate-500">Duration</div>
                         <div className="font-medium text-slate-900">
-                          {job.status === "pending" ? "Upcoming" : formatDuration(job.createdAt, job.completedAt)}
+                          {job.status === "pending" ? "Upcoming" : job.status === "training" ? "In Progress" : formatDuration(job.createdAt, job.completedAt)}
                         </div>
                       </div>
                       <div>
@@ -305,20 +317,20 @@ export default function TrainingPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-600">
               <div>
-                <h4 className="font-medium text-slate-900 mb-2">Resource Requirements</h4>
+                <h4 className="font-medium text-slate-900 mb-2">Pipeline</h4>
                 <ul className="space-y-1">
-                  <li>• Free tier: Limited cloud training (2 epochs max)</li>
-                  <li>• Pro tier: Full cloud training (up to 50 epochs)</li>
-                  <li>• Enterprise: Dedicated GPU resources</li>
+                  <li>• Builds a synthetic corpus from the ensemble architecture</li>
+                  <li>• Trains a TinyGPT (0.5M params) from random weights</li>
+                  <li>• Trains an answer-quality scorer on labeled examples</li>
+                  <li>• Run locally: <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">python -m train.train</code></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium text-slate-900 mb-2">Training Options</h4>
+                <h4 className="font-medium text-slate-900 mb-2">Models</h4>
                 <ul className="space-y-1">
-                  <li>• Transfer learning from popular models</li>
-                  <li>• Custom data fine-tuning</li>
-                  <li>• Multi-model ensembling</li>
-                  <li>• Quantization for edge deployment</li>
+                  <li>• ensemble-generator: offline ensemble candidate</li>
+                  <li>• ensemble-scorer: source/bias/clarity regression</li>
+                  <li>• 50/50 heuristic + learned scoring blend</li>
                 </ul>
               </div>
             </div>
@@ -353,7 +365,7 @@ export default function TrainingPage() {
                     type="text"
                     value={newJobName}
                     onChange={(e) => setNewJobName(e.target.value)}
-                    placeholder="e.g., Distill Gemma-7B, Fine-tune Qwen-1.8B"
+                    placeholder="e.g., TinyGPT from scratch, Retrain on corpus"
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
                   />
                 </div>
@@ -413,19 +425,21 @@ export default function TrainingPage() {
                     <div>
                       <div className="text-slate-500">Est. Time</div>
                       <div className="font-medium text-slate-900">
-                        {newJobEpochs === 1 ? "5-10 minutes" : newJobEpochs <= 5 ? "30-60 minutes" : newJobEpochs <= 10 ? "2-3 hours" : "6-12 hours"}
+                        {newJobBaseModel.startsWith("scratch") || newJobBaseModel.startsWith("ensemble")
+                          ? newJobEpochs <= 10 ? "20 seconds" : "~1 minute"
+                          : newJobEpochs === 1 ? "5-10 minutes" : newJobEpochs <= 5 ? "30-60 minutes" : newJobEpochs <= 10 ? "2-3 hours" : "6-12 hours"}
                       </div>
                     </div>
                     <div>
                       <div className="text-slate-500">GPU Memory</div>
                       <div className="font-medium text-slate-900">
-                        {baseModels.find((m) => m.id === newJobBaseModel)?.id.includes("70b") ? "16GB+" : baseModels.find((m) => m.id === newJobBaseModel)?.id.includes("7b") ? "8GB+" : "4GB+"}
+                        {newJobBaseModel.startsWith("scratch") || newJobBaseModel.startsWith("ensemble") ? "MPS/CPU" : newJobBaseModel.includes("7b") ? "8GB+" : "4GB+"}
                       </div>
                     </div>
                     <div>
                       <div className="text-slate-500">Cost</div>
                       <div className="font-medium text-slate-900">
-                        ${newJobEpochs === 1 ? "~$0.10" : newJobEpochs <= 5 ? "~$1.00" : newJobEpochs <= 10 ? "~$5.00" : "~$25.00"}
+                        {newJobBaseModel.startsWith("scratch") || newJobBaseModel.startsWith("ensemble") ? "Free (local)" : newJobEpochs === 1 ? "~$0.10" : newJobEpochs <= 5 ? "~$1.00" : newJobEpochs <= 10 ? "~$5.00" : "~$25.00"}
                       </div>
                     </div>
                   </div>
