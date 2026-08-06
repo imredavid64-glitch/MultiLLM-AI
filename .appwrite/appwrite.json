@@ -11,15 +11,11 @@
         "permissions": "read,write"
       },
       {
-        "name": "sustainability_metrics",
-        "permissions": "read,write"
-      },
-      {
-        "name": "knowledge_sources",
-        "permissions": "read,write"
-      },
-      {
         "name": "api_keys",
+        "permissions": "read,write"
+      },
+      {
+        "name": "training_jobs",
         "permissions": "read,write"
       }
     ]
@@ -39,7 +35,6 @@
   "storage": {
     "buckets": [
       "model_weights",
-      "carbon_data",
       "usage_analytics"
     ]
   }
