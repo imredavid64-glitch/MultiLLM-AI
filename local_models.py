@@ -84,7 +84,7 @@ class LocalTransformerProvider:
     Falls back gracefully when the trained model is missing.
     """
 
-    def __init__(self, temperature: float = 0.8, max_tokens: int = 160) -> None:
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 140) -> None:
         self.name = "Local TinyGPT (from scratch)"
         self.model = "ensemble-generator (4-layer TinyGPT)"
         self.temperature = temperature
@@ -118,7 +118,7 @@ class LocalTransformerProvider:
         seed = torch.tensor([seed_ids], dtype=torch.long, device=device)
         max_tokens = gen_p.max_tokens if gen_p is not None and gen_p.max_tokens else self.max_tokens
         with torch.no_grad():
-            out = model.generate(seed, max_new_tokens=max_tokens, temperature=temp, top_k=40)
+            out = model.generate(seed, max_new_tokens=max_tokens, temperature=temp, top_k=40, repetition_penalty=1.3)
         text = tokenizer.decode(out[0].tolist()[len(seed_ids):])
         # Trim trailing special tokens or repeated block markers.
         for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):

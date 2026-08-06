@@ -14,8 +14,8 @@ venv/
 chat_history.json
 thinking_temp.json
 ai_thinking_log.json
-knowledge_sources/*
-!knowledge_sources/.gitkeep
+# Seed docs are tracked; large/private user files can be added here later
+!knowledge_sources/*.md
 
 # Build
 build/

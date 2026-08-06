@@ -1,131 +1,107 @@
-# Unified Sustainable AI Ecosystem
+# MultiLLM — Ensemble AI SaaS Platform
 
-This repository combines the Multi LLM Desktop Suite with EcoBrain: Sustainable Local AI Engine into a comprehensive multi-language AI platform.
+One prompt. Multiple LLMs. The best answer, automatically selected.
 
-## Overview
+MultiLLM runs a multi-bot answer ensemble: several independent models answer
+your question in parallel, each candidate is scored for **source support**,
+**bias**, and **clarity**, and the best parts are merged into one balanced,
+cited answer. The platform also trains its own tiny models from scratch for
+fully offline inference and answer-quality scoring.
 
-The unified ecosystem brings together:
+## Live
 
-1. **Multi LLM Provider Stack** - Zero-key API key management, parallel bot execution
-2. **EcoBrain Learning Engine** - Local context retention, zero-GPU, sustainable AI reasoning  
-3. **Sustainable Analytics** - Real-time carbon footprint monitoring and optimization
-4. **Multi-Platform Runtime** - Python, C++, JavaScript, Java implementations
+- SaaS app: https://multillm-three.vercel.app
+- Works in **demo mode** (any email + 6-char password) until the Appwrite
+  database is provisioned.
 
-## Core Architecture
+## Repo layout
 
-### 1. Multi LLM Provider Stack (sustainable-ai)
-
-**Location**: `/Users/imredavid/Downloads/MultiLLM/ai_client.py`
-
-**Features**:
-- Zero-key Environment Loading: `.env` file for API configuration (never committed)
-- Parallel Bot Execution: N-way parallel inference with bot persona selection
-- Ensemble Synthesis: Multi-candidate comparison and final answer generation
-- Sustainability Metrics: Source quality, bias scoring, and carbon impact calculation
-- Privacy Redaction: Built-in sensitive pattern detection and redaction
-
-### 2. EcoBrain Learning Engine (sustainable-ai-brain)
-
-**Location**: `/Users/imredavid/Downloads/sustainable-ai-app/`
-
-**Core Classes**:
-- CustomLocalBrain: Local knowledge retention, vocabulary weight management
-- SearchAgent: Open-source DuckDuckGo integration with context extraction
-- SustainableAnalyst: Emissions tracking, sustainability metrics calculation
-
-**Key Features**:
-- Zero External Dependencies: Runs entirely offline after initial context
-- Carbon-Neutral: No cloud API calls, sustainable compute
-- Continuous Learning: Local brain weights update based on user preferences
-- Contextual Understanding: Advanced text processing without external APIs
-
-### 3. Carbon Footprint Calculator (sustainable-ai-core)
-
-**Purpose**: Real-time sustainability monitoring during AI operations
-
-**Metrics Tracked**:
-- Carbon Emissions: g CO₂ per query calculation
-- Water Footprint: Liters of water used per query
-- Carbon Savings: Avoided emissions vs. cloud API alternatives
-- Latency: Real-time performance monitoring
-
-## Integration Architecture
-
-### Unified Interface
-```python
-from sustainable_ai import UnifiedAI
-
-class SustainableAI:
-    def __init__(self):
-        self.multi_llm = MultiLLM()
-        self.eco_brain = CustomLocalBrain()
-        self.analyst = SustainableAnalyst()
-    
-    def query(self, question, config=None):
-        # Parallel execution of both engines
-        # Collect sustainability metrics
-        # Return unified response
-        pass
+```
+ai_client.py              Core ensemble engine (parallel bots, scoring, synthesis)
+local_models.py           Trained-model integration (offline candidate + scorer)
+ensemble_demo.py          Offline demo: run the ensemble with no API keys
+train/
+  dataset.py              Synthetic corpus generator (ensemble answering style)
+  model.py                TinyGPT (generator) + TinyScorer (regressor), from scratch
+  train.py                CLI to train both models (MPS/CPU, no downloads)
+models/                   Trained artifacts (reproducible via train.train)
+knowledge_sources/        Local docs used for retrieval-grounded answers
+vercel-deployment/        Next.js 14 SaaS (dashboard, auth, API keys, billing, analytics, training)
 ```
 
-## Key Benefits
+## Quickstart
 
-✅ **Zero Environmental Impact**: Carbon-neutral AI operations  
-✅ **Zero Privacy Risk**: No data leaves local machines  
-✅ **Zero Cost**: No API key expenses  
-✅ **Zero Infrastructure**: Works on any device  
-✅ **Multi-Language Support**: Python, JavaScript, Java, C++  
-✅ **Edge Computing Ready**: Optimized for local execution  
-
-## Getting Started (Python)
+### 1. Run the offline ensemble (no API keys)
 
 ```bash
-cd /Users/imredavid/Downloads/MultiLLM
-pip install -r requirements.txt
-streamlit run ai_client_test_ui.py
+python3 ensemble_demo.py "How does a multi-LLM ensemble improve answer quality?"
+python3 ensemble_demo.py --sources "Your question here"
 ```
 
-## Runtime Setup
+### 2. Train the tiny models (from scratch, ~1 minute on Apple Silicon)
 
-### Python (Primary)
-- `MultiLLM/ai_client.py` - Core Multi LLM logic
-- `sustainable-ai-app/` - Sustainable AI modules
+```bash
+python3 -m train.dataset    # rebuild synthetic corpus
+python3 -m train.train      # train generator + scorer -> models/
+```
 
-### JavaScript Runtime (Browser/Node.js)
-- `js/` - Web-optimized versions
+### 3. Use remote providers (optional)
 
-### Java Runtime (Android, Enterprise)
-- `java/` - Java implementation
+Set at least one key set in `.env` (never commit it):
 
-### C++ Runtime (Performance Critical)
-- `cpp/` - High-performance implementation
+```
+OPENAI_API_KEYS=sk-...            # or OPENAI_API_KEY (OpenRouter: sk-or-v1-...)
+GEMINI_API_KEY=...
+MISTRAL_API_KEY=...
+```
 
-## Future Roadmap
+Then run the full ensemble with the trained local model plus remote providers:
 
-### Phase 1: Core Foundation (Complete)
-- Unified library architecture
-- Multi-platform implementations
-- Basic sustainability metrics
+```bash
+python3 ai_client.py
+```
 
-### Phase 2: Advanced Features (In Progress)
-- [ ] Model compression and quantization
-- [ ] Edge device optimization
-- [ ] Advanced sustainability reporting
+### 4. Run the SaaS (Next.js)
 
-### Phase 3: Ecosystem Growth (Future)
-- [ ] Community plugin system
-- [ ] Multi-language model support
-- [ ] Enterprise deployment options
+```bash
+cd vercel-deployment
+npm install
+npm run dev
+```
 
-## Contributing
+Set `NEXT_PUBLIC_APPWRITE_ENDPOINT` and `NEXT_PUBLIC_APPWRITE_PROJECT_ID` to
+enable real authentication and persistence. Without them, the app runs in
+**demo mode** (localStorage-backed auth) so everything is still testable.
 
-This is an open ecosystem designed for contributions:
+## How the ensemble works
 
-1. **Add New Providers**: Implement new ChatProvider subclasses
-2. **Platform Support**: Add new runtime implementations
-3. **Optimization**: Improve algorithm efficiency
-4. **Documentation**: Add examples and tutorials
+1. **Parallel bots** — N personas (Factual Analyst, Skeptical Reviewer, Neutral
+   Teacher, ...) each answer via a provider.
+2. **Scoring** — every candidate is scored: source support (citation + token
+   overlap), bias (absolute-word penalty + framing), clarity (length/structure).
+   The trained `TinyScorer` blends 50/50 with the heuristics when present.
+3. **Synthesis** — the top candidates are merged by a judge step that keeps only
+   supported claims, preserves tradeoffs, and explains conflicts.
+4. **Privacy** — prompts/answers are redacted for sensitive patterns (emails,
+   keys, cards, SSNs) before any remote API call.
+
+## Local models
+
+- **ensemble-generator** — TinyGPT (4-layer decoder, ~0.5M params) trained from
+  random weights on the synthetic ensemble corpus. Acts as an offline candidate.
+- **ensemble-scorer** — regresses (source_support, bias_score, clarity_score).
+
+Both train with `python -m train.train` — no downloads, no API keys.
+
+## Roadmap
+
+- [x] Ensemble engine + heuristic scoring
+- [x] Tiny models trained from scratch (offline candidate + scorer)
+- [x] SaaS dashboard (login, API keys, analytics, billing, settings, training)
+- [x] Demo mode (usable before backend is wired)
+- [ ] Provision Appwrite: project, collections, functions, real auth + persistence
+- [ ] Wire training page to real job execution
 
 ## License
 
-This project is licensed under the MIT License.
+MIT

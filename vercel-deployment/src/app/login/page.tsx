@@ -16,7 +16,7 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
   const router = useRouter();
-  const { login, register } = useAuth();
+  const { login, register, demoMode } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +64,12 @@ export default function LoginPage() {
               ? "Start running ensemble LLMs in seconds"
               : "Sign in to access your dashboard"}
           </p>
+          {demoMode && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-xs font-medium">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Demo mode — any email + 6-char password works. Database (Appwrite) coming soon.
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
