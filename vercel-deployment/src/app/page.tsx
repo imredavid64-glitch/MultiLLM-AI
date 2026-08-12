@@ -4,9 +4,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain } from "lucide-react";
-import { MultiLLM } from "@/lib/multi-llm";
 import { toast } from "react-hot-toast";
 import type { SustainabilityMetrics } from "@/types/multi-llm";
+
+const quickPrompts = [
+  "Explain quantum computing in simple terms",
+  "What are the risks of relying on a single AI model?",
+  "How can I reduce my carbon footprint?",
+];
 
 export default function HomePage() {
   const [query, setQuery] = useState("");
@@ -15,22 +20,23 @@ export default function HomePage() {
   
   const queryClient = useQueryClient();
 
-  const multiLLM = new MultiLLM();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    
+  const runQuery = async (text: string) => {
+    if (!text.trim()) return;
+    setQuery(text);
     setIsLoading(true);
     const toastId = toast.loading("Querying ensemble of LLMs...");
     
     try {
-      const answer = await multiLLM.query(query, {
-        temperature: 0.2,
-        max_tokens: 1024,
-        top_p: 1.0,
-        repetition_penalty: 1.0
+      const res = await fetch("/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || `Ensemble query failed (${res.status})`);
+      }
+      const answer = await res.json();
       
       toast.success("Ensemble complete!", { id: toastId });
       setResult(answer);
@@ -43,6 +49,11 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runQuery(query);
   };
 
   return (
@@ -108,6 +119,24 @@ export default function HomePage() {
               <Zap className="w-5 h-5" />
             </button>
           </form>
+
+          {/* Quick prompts */}
+          <div className="mt-5">
+            <p className="text-sm font-medium text-slate-500 mb-3">Try a quick prompt:</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {quickPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => runQuery(prompt)}
+                  disabled={isLoading}
+                  className="px-4 py-2 rounded-full bg-white border border-slate-200 text-sm text-slate-600 hover:border-purple-400 hover:text-purple-600 hover:shadow-sm disabled:opacity-50 transition-all"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
         </motion.div>
       </section>
 

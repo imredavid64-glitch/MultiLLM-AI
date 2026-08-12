@@ -1,0 +1,27 @@
+{
+  "generator": {
+    "name": "ensemble-generator",
+    "kind": "generator",
+    "vocab_size": 1117,
+    "block_size": 512,
+    "n_layer": 6,
+    "n_head": 4,
+    "n_embd": 128,
+    "params": 1395328
+  },
+  "scorer": {
+    "name": "ensemble-scorer",
+    "kind": "scorer",
+    "vocab_size": 1117,
+    "block_size": 192,
+    "n_embd": 96,
+    "n_layer": 2,
+    "n_head": 3,
+    "params": 351971
+  },
+  "corpus": {
+    "docs": 2344,
+    "chars": 2747164,
+    "version": 4
+  }
+}

@@ -6,6 +6,7 @@ import { Key, Copy, Trash2, Eye, EyeOff, Shield, Clock, AlertCircle, CheckCircle
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { toast } from "react-hot-toast";
+import DashboardHeader from "@/components/layout/dashboard-header";
 
 const mockApiKeys = [
   {
@@ -16,8 +17,8 @@ const mockApiKeys = [
     tier: "pro",
     rateLimit: 100,
     monthlyUsage: 2847,
-    lastUsed: "2024-01-15T10:30:00Z",
-    createdAt: "2024-01-01T00:00:00Z",
+    lastUsed: new Date().toISOString(),
+    createdAt: "2026-07-01T00:00:00Z",
   },
   {
     id: "key_2",
@@ -27,8 +28,8 @@ const mockApiKeys = [
     tier: "free",
     rateLimit: 10,
     monthlyUsage: 156,
-    lastUsed: "2024-01-14T15:22:00Z",
-    createdAt: "2024-01-10T00:00:00Z",
+    lastUsed: new Date().toISOString(),
+    createdAt: "2026-07-10T00:00:00Z",
   },
 ];
 
@@ -43,7 +44,7 @@ export default function ApiKeysPage() {
 
   const generateKey = (tier: string) => {
     const prefix = tier === "enterprise" ? "mllm_ent_" : tier === "pro" ? "mllm_pro_" : "mllm_dev_";
-    const randomPart = Array.from({ length: 32 }, () => Math.random().toString(36).charAt(2)).join("");
+    const randomPart = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
     return `${prefix}${randomPart}`;
   };
 
@@ -73,11 +74,15 @@ export default function ApiKeysPage() {
     toast.success("API key created! Save it now - you won't see it again.");
   };
 
-  const copyToClipboard = (key: string) => {
-    navigator.clipboard.writeText(key);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 3000);
-    toast.success("Copied to clipboard!");
+  const copyToClipboard = async (key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 3000);
+      toast.success("Copied to clipboard!");
+    } catch {
+      toast.error("Could not copy to clipboard");
+    }
   };
 
   const deleteKey = (id: string) => {
@@ -101,30 +106,7 @@ export default function ApiKeysPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50">
-        {/* Header */}
-        <header className="bg-white shadow-sm sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-8">
-                <a href="/dashboard" className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-purple-600">MultiLLM</span>
-                </a>
-                <nav className="hidden md:flex items-center gap-6">
-                  <a href="/dashboard" className="text-slate-700 hover:text-purple-600 font-medium">Dashboard</a>
-                  <a href="/dashboard/api-keys" className="text-purple-600 font-medium">API Keys</a>
-                  <a href="/dashboard/training" className="text-slate-700 hover:text-purple-600 font-medium">Training</a>
-                  <a href="/dashboard/analytics" className="text-slate-700 hover:text-purple-600 font-medium">Analytics</a>
-                </nav>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-slate-600">{user?.prefs?.subscriptionTier || "Free"}</span>
-                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium">
-                  {user?.name?.charAt(0).toUpperCase() || "U"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader />
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -188,7 +170,7 @@ export default function ApiKeysPage() {
                           {getTierBadge(key.tier)}
                         </div>
                         <p className="text-sm text-slate-500 font-mono truncate max-w-xs">
-                          {copiedKey === key.key ? "••••••••••••••••••••••••••••••••" : `${key.prefix}••••••••••••••••••••`}
+                          {showKey === key.key ? key.key : `${key.prefix}••••••••••••••••••••`}
                         </p>
                       </div>
                     </div>

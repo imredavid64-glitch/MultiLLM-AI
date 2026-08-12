@@ -20,6 +20,7 @@ MODELS_DIR = BASE_DIR / "models"
 GENERATOR_DIR = MODELS_DIR / "ensemble-generator"
 SCORER_DIR = MODELS_DIR / "ensemble-scorer"
 TOKENIZER_PATH = MODELS_DIR / "tokenizer.json"
+SCORER_TOKENIZER_PATH = MODELS_DIR / "scorer-tokenizer.json"
 
 
 class LocalModels:
@@ -28,11 +29,17 @@ class LocalModels:
     def __init__(self, device: str = "auto") -> None:
         self.device = device
         self._tokenizer = None
+        self._scorer_tokenizer = None
         self._generator = None
         self._scorer = None
 
     def available(self) -> bool:
-        return GENERATOR_DIR.exists() and SCORER_DIR.exists() and TOKENIZER_PATH.exists()
+        return (
+            GENERATOR_DIR.exists()
+            and SCORER_DIR.exists()
+            and TOKENIZER_PATH.exists()
+            and SCORER_TOKENIZER_PATH.exists()
+        )
 
     def _pick_device(self) -> str:
         if self.device != "auto":
@@ -55,6 +62,13 @@ class LocalModels:
             self._tokenizer = WordTokenizer.load(TOKENIZER_PATH)
         return self._tokenizer
 
+    def scorer_tokenizer(self):
+        if self._scorer_tokenizer is None:
+            from train.model import WordTokenizer
+
+            self._scorer_tokenizer = WordTokenizer.load(SCORER_TOKENIZER_PATH)
+        return self._scorer_tokenizer
+
     def generator(self):
         if self._generator is None:
             from train.model import TinyGPT
@@ -74,6 +88,54 @@ class LocalModels:
         return cfg
 
 
+def _build_local_prompt(messages: Sequence[Dict[str, str]]) -> str:
+    """Reconstruct the exact chat format the model was trained on.
+
+    Training docs look like:
+
+        <|user|>
+        User request:\n...
+        Local sources:\n...
+        Answer rules:\n...
+        <|assistant|>
+        Persona: <name>. <instruction>
+        Keep final answer practical and concise.
+        Bot answer:\n...
+
+    The system message carries the persona and the last user message carries
+    the task (User request / Local sources / Answer rules), so we map them
+    directly instead of flattening with "SYSTEM:/USER:" prefixes the model has
+    never seen.
+    """
+    from ai_client import SYSTEM_PROMPT_BASE
+
+    persona_lines: List[str] = []
+    task_lines: List[str] = []
+    for msg in messages:
+        role = (msg.get("role") or "").lower()
+        content = (msg.get("content") or "").strip()
+        if not content:
+            continue
+        if role == "system":
+            body = content
+            if body.startswith(SYSTEM_PROMPT_BASE.strip()):
+                body = body[len(SYSTEM_PROMPT_BASE.strip()):].strip()
+            persona_lines.append(body)
+        elif role == "user":
+            task_lines.append(content)
+
+    persona = " ".join(line.strip() for line in persona_lines if line.strip()) or "Neutral Teacher. Explain clearly."
+    task = "\n\n".join(line.strip() for line in task_lines if line.strip())
+
+    if task.startswith("User request:"):
+        user_block = task
+    else:
+        user_block = f"User request:\n{task}"
+
+    prompt = f"<|user|>\n{user_block}\n<|assistant|>\n{persona}\nKeep final answer practical and concise.\nBot answer:\n"
+    return prompt
+
+
 _LOCAL = LocalModels()
 
 
@@ -84,9 +146,9 @@ class LocalTransformerProvider:
     Falls back gracefully when the trained model is missing.
     """
 
-    def __init__(self, temperature: float = 0.7, max_tokens: int = 140) -> None:
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 450) -> None:
         self.name = "Local TinyGPT (from scratch)"
-        self.model = "ensemble-generator (4-layer TinyGPT)"
+        self.model = "ensemble-generator (6-layer TinyGPT)"
         self.temperature = temperature
         self.max_tokens = max_tokens
 
@@ -99,19 +161,19 @@ class LocalTransformerProvider:
         temperature: float,
         gen_p: "GenerationConfig | None" = None,
     ) -> str:
-        from ai_client import flatten_messages, redact_sensitive
-
-        prompt = flatten_messages(messages)
-        prompt = redact_sensitive(prompt)
+        from ai_client import redact_sensitive
 
         if not _LOCAL.available():
             raise RuntimeError("Trained model not found. Run: python -m train.train")
+
+        prompt = _build_local_prompt(messages)
+        prompt = redact_sensitive(prompt)
 
         tokenizer = _LOCAL.tokenizer()
         model = _LOCAL.generator()
         temp = gen_p.temperature if gen_p is not None else temperature
 
-        seed_ids = tokenizer.encode("<|user|>\n" + prompt + "\n<|assistant|>\n")
+        seed_ids = tokenizer.encode(prompt)
         import torch
 
         device = next(model.parameters()).device
@@ -144,7 +206,7 @@ def model_score_answer(
     try:
         from ai_client import redact_sensitive
 
-        tokenizer = _LOCAL.tokenizer()
+        tokenizer = _LOCAL.scorer_tokenizer()
         scorer = _LOCAL.scorer()
         import torch
 

@@ -1,67 +1,84 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 import { motion } from "framer-motion";
 import { Cloud, Cpu, Database, HardDrive, Layers, Play, Upload, Trash2, Download } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import DashboardHeader from "@/components/layout/dashboard-header";
 
-const mockTrainingJobs = [
-  {
-    id: "job_1",
-    name: "TinyGPT ensemble-generator (from scratch)",
-    status: "completed" as const,
-    progress: 100,
-    baseModel: "scratch-tinygpt",
-    epochs: 30,
-    learningRate: 0.003,
-    createdAt: "2026-08-05T00:00:00Z",
-    completedAt: "2026-08-05T00:21:00Z",
-    modelPath: "/models/ensemble-generator",
-  },
-  {
-    id: "job_2",
-    name: "TinyScorer answer-quality regressor",
-    status: "completed" as const,
-    progress: 100,
-    baseModel: "scratch-tinygpt",
-    epochs: 40,
-    learningRate: 0.003,
-    createdAt: "2026-08-05T00:22:00Z",
-    completedAt: "2026-08-05T00:23:30Z",
-    modelPath: "/models/ensemble-scorer",
-  },
-  {
-    id: "job_3",
-    name: "Retrain on user corpus",
-    status: "pending" as const,
-    progress: 0,
-    baseModel: "scratch-tinygpt",
-    epochs: 30,
-    learningRate: 0.003,
-    createdAt: "2026-08-05T09:00:00Z",
-    estimatedCompletion: "2026-08-05T09:30:00Z",
-  },
-  {
-    id: "job_4",
-    name: "Fine-tune Gemma-7B on custom data",
-    status: "training" as const,
-    progress: 45,
-    baseModel: "gemma-2b",
-    epochs: 3,
-    learningRate: 0.0002,
-    createdAt: "2026-08-05T00:00:00Z",
-    estimatedCompletion: "2026-08-05T12:00:00Z",
-  },
-];
+interface TrainingJob {
+  id: string;
+  name: string;
+  status: "pending" | "training" | "completed" | "failed";
+  progress: number;
+  baseModel: string;
+  epochs: number;
+  learningRate: number;
+  createdAt: string;
+  completedAt?: string;
+  estimatedCompletion?: string;
+  modelPath?: string;
+}
+
+interface TrainingData {
+  jobs: TrainingJob[];
+  models: Array<{ id: string; name: string; params: number; nLayer: number; nEmbd: number; blockSize: number }>;
+  corpus: { docs: number; chars: number };
+}
+
+const formatParams = (n: number) => {
+  if (!n) return "—";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return `${n}`;
+};
 
 export default function TrainingPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newJobName, setNewJobName] = useState("");
   const [newJobBaseModel, setNewJobBaseModel] = useState("scratch-tinygpt");
   const [newJobEpochs, setNewJobEpochs] = useState(3);
   const [newJobLearningRate, setNewJobLearningRate] = useState(0.0002);
+
+  const { data: training, isLoading } = useQuery<TrainingData>(
+    ["training"],
+    async () => {
+      const res = await fetch("/api/training");
+      if (!res.ok) throw new Error("Failed to load training data");
+      return res.json();
+    },
+    { refetchInterval: 3000 },
+  );
+
+  const createJob = useMutation(
+    async (job: { name: string; baseModel: string; epochs: number; learningRate: number }) => {
+      const res = await fetch("/api/training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(job),
+      });
+      if (!res.ok) throw new Error("Failed to create job");
+      return res.json();
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(["training"]);
+        setShowCreateModal(false);
+        setNewJobName("");
+        setNewJobBaseModel("scratch-tinygpt");
+        setNewJobEpochs(3);
+        setNewJobLearningRate(0.0002);
+      },
+    },
+  );
+
+  const mockTrainingJobs = training?.jobs ?? [];
+  const registryModels = training?.models ?? [];
+  const corpus = training?.corpus ?? { docs: 0, chars: 0 };
 
   const baseModels = [
     { id: "scratch-tinygpt", name: "TinyGPT (scratch)", params: "0.5M", company: "MultiLLM" },
@@ -73,18 +90,12 @@ export default function TrainingPage() {
 
   const handleCreateJob = () => {
     if (!newJobName.trim()) return;
-    // In a real app, this would create a training job in the database
-    console.log("Creating training job:", {
+    createJob.mutate({
       name: newJobName,
       baseModel: newJobBaseModel,
       epochs: newJobEpochs,
       learningRate: newJobLearningRate,
     });
-    setShowCreateModal(false);
-    setNewJobName("");
-    setNewJobBaseModel("gemma-2b");
-    setNewJobEpochs(3);
-    setNewJobLearningRate(0.0002);
   };
 
   const getStatusColor = (status: string) => {
@@ -110,31 +121,7 @@ export default function TrainingPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50">
-        {/* Header */}
-        <header className="bg-white shadow-sm sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-8">
-                <a href="/dashboard" className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-purple-600">MultiLLM</span>
-                </a>
-                <nav className="hidden md:flex items-center gap-6">
-                  <a href="/dashboard" className="text-slate-700 hover:text-purple-600 font-medium">Dashboard</a>
-                  <a href="/dashboard/api-keys" className="text-slate-700 hover:text-purple-600 font-medium">API Keys</a>
-                  <a href="/dashboard/training" className="text-purple-600 font-medium">Training</a>
-                  <a href="/dashboard/analytics" className="text-slate-700 hover:text-purple-600 font-medium">Analytics</a>
-                  <a href="/dashboard/settings" className="text-slate-700 hover:text-purple-600 font-medium">Settings</a>
-                </nav>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-slate-600">{user?.prefs?.subscriptionTier || "Free"}</span>
-                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium">
-                  {user?.name?.charAt(0).toUpperCase() || "U"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader />
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -192,6 +179,57 @@ export default function TrainingPage() {
                 )}
               </motion.div>
             ))}
+          </motion.div>
+
+          {/* Model Registry */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="mb-8"
+          >
+            <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Database className="w-5 h-5 text-purple-600" />
+              Model Registry
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {registryModels.length > 0 ? (
+                registryModels.map((model) => (
+                  <div key={model.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-slate-900">{model.name}</h3>
+                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">ready</span>
+                    </div>
+                    <div className="text-3xl font-bold text-purple-600 mb-1">{formatParams(model.params)}</div>
+                    <div className="text-sm text-slate-500 mb-4">parameters</div>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <div className="text-slate-500">Layers</div>
+                        <div className="font-medium text-slate-900">{model.nLayer}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500">Embedding</div>
+                        <div className="font-medium text-slate-900">{model.nEmbd}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500">Context</div>
+                        <div className="font-medium text-slate-900">{model.blockSize}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-500">
+                  {isLoading ? "Loading model registry..." : "No trained models found. Run `python -m train.train` to train them."}
+                </div>
+              )}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-center">
+                <h3 className="font-semibold text-slate-900 mb-2">Training Corpus</h3>
+                <div className="text-3xl font-bold text-blue-600 mb-1">{corpus.docs.toLocaleString()}</div>
+                <div className="text-sm text-slate-500 mb-4">chat-style docs</div>
+                <div className="text-sm text-slate-600">{(corpus.chars / 1_000_000).toFixed(1)}M chars · synthetic + knowledge_sources</div>
+              </div>
+            </div>
           </motion.div>
 
           {/* Training Jobs */}
@@ -293,7 +331,7 @@ export default function TrainingPage() {
                       <div className="mt-4 pt-4 border-t border-slate-100">
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                           <div className="text-sm text-blue-800">
-                            <strong>Estimated completion:</strong> {formatDate(job.estimatedCompletion)}
+                            <strong>Estimated completion:</strong> {job.estimatedCompletion ? formatDate(job.estimatedCompletion) : "Calculating..."}
                           </div>
                         </div>
                       </div>
@@ -320,7 +358,7 @@ export default function TrainingPage() {
                 <h4 className="font-medium text-slate-900 mb-2">Pipeline</h4>
                 <ul className="space-y-1">
                   <li>• Builds a synthetic corpus from the ensemble architecture</li>
-                  <li>• Trains a TinyGPT (0.5M params) from random weights</li>
+                  <li>• Trains a TinyGPT (8-layer, ~2.4M params) from random weights</li>
                   <li>• Trains an answer-quality scorer on labeled examples</li>
                   <li>• Run locally: <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">python -m train.train</code></li>
                 </ul>

@@ -38,11 +38,23 @@ python3 ensemble_demo.py "How does a multi-LLM ensemble improve answer quality?"
 python3 ensemble_demo.py --sources "Your question here"
 ```
 
-### 2. Train the tiny models (from scratch, ~1 minute on Apple Silicon)
+### 2. Train the tiny models (from scratch, a few minutes on Apple Silicon)
 
 ```bash
-python3 -m train.dataset    # rebuild synthetic corpus
-python3 -m train.train      # train generator + scorer -> models/
+python3 -m train.dataset    # rebuild synthetic corpus + scorer labels
+python3 -m train.train      # train generator + scorer -> models/  (uses MPS)
+```
+
+Both models use a word-level tokenizer (~1,100 vocab) trained on a synthetic
+corpus of ~2,300 chat-style documents (~2.7M characters) built from 40 domain
+concepts, each with multiple question phrasings, so the generator learns answer
+style rather than memorizing exact questions. Set `--cpu` to force CPU, or pass
+`--epochs N` / `--batch-size N` / `--n-layer N` / `--n-embd N` to tune.
+
+Evaluate generalization on held-out questions with:
+
+```bash
+python3 -m train.eval_generator
 ```
 
 ### 3. Use remote providers (optional)
@@ -87,9 +99,13 @@ enable real authentication and persistence. Without them, the app runs in
 
 ## Local models
 
-- **ensemble-generator** — TinyGPT (4-layer decoder, ~0.5M params) trained from
-  random weights on the synthetic ensemble corpus. Acts as an offline candidate.
-- **ensemble-scorer** — regresses (source_support, bias_score, clarity_score).
+- **ensemble-generator** — TinyGPT (6-layer decoder, ~1.4M params) trained from
+  random weights on the synthetic ensemble corpus with a word-level tokenizer
+  (block size 512, so full prompts fit in context). Acts as an offline
+  candidate and privacy-preserving fallback.
+- **ensemble-scorer** — regresses (source_support, bias_score, clarity_score),
+  blended 50/50 with heuristic scoring. Uses its own tokenizer
+  (`models/scorer-tokenizer.json`).
 
 Both train with `python -m train.train` — no downloads, no API keys.
 

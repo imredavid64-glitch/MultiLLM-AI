@@ -1,9 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User } from "@/lib/appwrite/types";
-import { account } from "@/lib/appwrite/client";
-import { ID } from "@/lib/appwrite/client";
+import { User, UserPrefs } from "@/lib/appwrite/types";
+import { account, ID } from "@/lib/appwrite/client";
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +12,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (updates: Partial<User> & { prefs?: Partial<UserPrefs> }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -95,6 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (email: string, password: string, name: string) => {
     if (demoMode) {
+      if (!password || password.length < 6) {
+        throw new Error("Password must be at least 6 characters long.");
+      }
       const u = demoUser(email, name || email.split("@")[0]);
       window.localStorage.setItem(DEMO_USER_KEY, JSON.stringify(u));
       setUser(u);
@@ -119,8 +122,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchUser();
   };
 
+  const updateUser = async (updates: Partial<User> & { prefs?: Partial<UserPrefs> }) => {
+    if (demoMode) {
+      const current = loadDemoUser() ?? user;
+      if (!current) return;
+      const next: User = {
+        ...current,
+        ...updates,
+        prefs: { ...current.prefs, ...(updates.prefs ?? {}) },
+      };
+      window.localStorage.setItem(DEMO_USER_KEY, JSON.stringify(next));
+      setUser(next);
+      return;
+    }
+    if (updates.prefs) {
+      await account.updatePrefs({ ...updates.prefs } as unknown as Record<string, unknown>);
+    }
+    if (updates.name) {
+      await account.updateName(updates.name);
+    }
+    await fetchUser();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, demoMode, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, demoMode, login, register, logout, refreshUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

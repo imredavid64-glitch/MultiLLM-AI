@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Zap, BarChart2, Key, Brain, ArrowRight, Users, Shield, Download, Clock } from "lucide-react";
+import { Zap, BarChart2, Key, Brain, Shield, Clock } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SUBSCRIPTION_TIERS } from "@/lib/appwrite/types";
+import DashboardHeader from "@/components/layout/dashboard-header";
 
 const stats = [
   { label: "Queries This Month", value: "2,847", change: "+12%", icon: Zap, color: "text-purple-600", bg: "bg-purple-100" },
@@ -27,30 +28,7 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50">
-        {/* Header */}
-        <header className="bg-white shadow-sm sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-8">
-                <Link href="/dashboard" className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-purple-600">MultiLLM</span>
-                </Link>
-                <nav className="hidden md:flex items-center gap-6">
-                  <Link href="/dashboard" className="text-slate-700 hover:text-purple-600 font-medium">Dashboard</Link>
-                  <Link href="/dashboard/api-keys" className="text-slate-700 hover:text-purple-600 font-medium">API Keys</Link>
-                  <Link href="/dashboard/training" className="text-slate-700 hover:text-purple-600 font-medium">Training</Link>
-                  <Link href="/dashboard/analytics" className="text-slate-700 hover:text-purple-600 font-medium">Analytics</Link>
-                </nav>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-slate-600">{user?.prefs?.subscriptionTier || "Free"}</span>
-                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium">
-                  {user?.name?.charAt(0).toUpperCase() || "U"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader />
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

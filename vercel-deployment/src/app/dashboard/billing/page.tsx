@@ -6,6 +6,7 @@ import { CreditCard, Calendar, Download, ArrowRight, Check, Crown, Zap, Users, S
 import { toast } from "react-hot-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import DashboardHeader from "@/components/layout/dashboard-header";
 import { SUBSCRIPTION_TIERS, SubscriptionTier } from "@/lib/appwrite/types";
 
 const mockSubscription = {
@@ -83,32 +84,7 @@ export default function BillingPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50">
-        {/* Header */}
-        <header className="bg-white shadow-sm sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-8">
-                <a href="/dashboard" className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-purple-600">MultiLLM</span>
-                </a>
-                <nav className="hidden md:flex items-center gap-6">
-                  <a href="/dashboard" className="text-slate-700 hover:text-purple-600 font-medium">Dashboard</a>
-                  <a href="/dashboard/api-keys" className="text-slate-700 hover:text-purple-600 font-medium">API Keys</a>
-                  <a href="/dashboard/training" className="text-slate-700 hover:text-purple-600 font-medium">Training</a>
-                  <a href="/dashboard/analytics" className="text-slate-700 hover:text-purple-600 font-medium">Analytics</a>
-                  <a href="/dashboard/settings" className="text-slate-700 hover:text-purple-600 font-medium">Settings</a>
-                  <a href="/dashboard/billing" className="text-purple-600 font-medium">Billing</a>
-                </nav>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-slate-600">{user?.prefs?.subscriptionTier || "Free"}</span>
-                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium">
-                  {user?.name?.charAt(0).toUpperCase() || "U"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader />
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -134,6 +134,297 @@ DOMAIN_EXAMPLES: List[Tuple[str, str, str]] = [
         "Local inference avoids remote data-center overhead.",
         "Running a small model locally avoids sending prompts to remote data centers, which can lower the estimated carbon footprint per query. The sustainability layer tracks this as one metric among several. Local models are smaller, so they trade some quality for lower cost and better privacy.",
     ),
+    (
+        "How does the ensemble handle conflicting answers from different models?",
+        "The synthesis step identifies and resolves conflicts between candidates.",
+        "When candidates disagree, the synthesis step compares their claims against source support. Conflicts are noted explicitly in the final answer, with the most well-supported perspective given priority. The judge also looks for common ground and presents balanced tradeoffs where models have different but valid viewpoints.",
+    ),
+    (
+        "What types of questions work best with this ensemble?",
+        "Fact-based questions with local sources get the best results.",
+        "Questions that can be answered from the knowledge_sources/ directory produce the highest quality answers. The ensemble also handles open-ended questions well by presenting multiple perspectives. Complex multi-part questions may need to be broken down for optimal results.",
+    ),
+    (
+        "Can I customize the scoring weights for candidates?",
+        "Yes, the scoring formula can be adjusted in the code.",
+        "The default weights are 50% source support, 25% bias score, and 25% clarity score. These can be modified in the build_ensemble_answer function to prioritize different aspects. For example, increasing source support weight makes answers more conservative and fact-based.",
+    ),
+    (
+        "What happens during the synthesis step if candidates are very different?",
+        "The judge extracts and combines the best parts from each candidate.",
+        "The synthesis step evaluates each candidate's contributions independently. It keeps claims that have strong source support, preserves balanced framing, and explains where candidates disagreed. The final answer is a coherent whole rather than a patchwork, with citations maintained for traceability.",
+    ),
+    (
+        "How does the system prevent leaking sensitive information?",
+        "Redaction happens before any API call, not after.",
+        "Privacy redaction scans the prompt and all previous messages for sensitive patterns before they are sent to any remote API. This means secrets never leave the local environment. The redaction uses regex patterns for common sensitive data types and replaces matches with [REDACTED] markers.",
+    ),
+    (
+        "What is the purpose of the persona system?",
+        "Personas encourage diverse perspectives in candidate answers.",
+        "Each bot adopts a specific persona like Factual Analyst, Skeptical Reviewer, or Neutral Teacher. This encourages the ensemble to generate answers from different angles. The persona instructions guide the model to focus on particular aspects, which are then balanced during synthesis.",
+    ),
+    (
+        "How are long documents handled in knowledge_sources?",
+        "They are split into chunks for retrieval.",
+        "Long documents are automatically split into paragraphs of roughly 850 characters each. Each chunk is indexed separately and can be retrieved independently. This allows the system to find relevant passages from long documents without being overwhelmed by irrelevant content.",
+    ),
+    (
+        "What metrics does the system track for each query?",
+        "Source support, bias score, clarity score, and total score.",
+        "Each candidate answer is evaluated on three dimensions: source support measures factual grounding, bias score measures balanced framing, and clarity score measures readability. These are combined into a total score for ranking. The final answer also receives these scores for transparency.",
+    ),
+    (
+        "How does the system handle ambiguous questions?",
+        "Ambiguous prompts are flagged and answered with explicit assumptions.",
+        "When a question can be read several ways, the ensemble states the assumption it uses and answers under that reading. It also notes the alternative interpretation so the user can re-ask. This reduces the chance of answering a different question than the one intended.",
+    ),
+    (
+        "What are the limits of the tiny local models?",
+        "They are small, fast, and offline, but answer depth is limited.",
+        "The local TinyGPT generator runs fully offline with no API cost, but its small size means it produces concise, style-consistent answers rather than deep expertise. It works best as one candidate in the ensemble and as a privacy-preserving fallback. Larger remote models can add depth when available.",
+    ),
+    (
+        "How do multiple API keys get used?",
+        "Keys are rotated in round-robin order to spread rate limits.",
+        "If a provider has several keys configured, the ensemble uses them in round-robin order. This spreads usage across keys and reduces the chance of hitting a per-key rate limit. A single exhausted key does not stop the ensemble because the next key is tried automatically.",
+    ),
+    (
+        "How is chat history handled between turns?",
+        "Recent messages are kept in context, older ones are summarized.",
+        "The ensemble keeps recent turns in the active context and summarizes older ones to control token usage. Long histories are trimmed so the prompt stays within provider limits. Redaction runs on the full message history, not just the latest message.",
+    ),
+    (
+        "How does the ensemble choose which persona to use?",
+        "Personas are assigned to parallel bots to diversify answers.",
+        "Each parallel bot is given a distinct persona, such as Factual Analyst or Risk Auditor, so the same question is answered from different angles. The personas are assigned round-robin across bots. This diversity is one reason the ensemble can catch blind spots that a single perspective would miss.",
+    ),
+    (
+        "How does retrieval decide which source chunks are relevant?",
+        "Chunks are scored by BM25 against the question tokens.",
+        "When a question arrives, the source index tokenizes it and scores every chunk with BM25, a ranking function that balances term frequency against how common each term is across the corpus. The highest-scoring chunks are returned as sources. Because BM25 uses token overlap, rephrasing a question changes which chunks match, so well-worded questions retrieve better evidence.",
+    ),
+    (
+        "What generation parameters control the bot output?",
+        "Temperature, top_p, top_k, and repetition penalty shape each answer.",
+        "Each bot call accepts generation settings: temperature controls how random sampling is, top_p and top_k trim the candidate token set, and the repetition penalty discourages repeated phrases. Lower temperatures give more conservative, predictable answers while higher temperatures explore more. These settings are per-provider, so the ensemble can tune each bot independently.",
+    ),
+    (
+        "What happens if every provider fails at once?",
+        "The query returns an error unless a local fallback exists.",
+        "Each provider call is retried with backoff, and failed bots are excluded from ranking. If every configured provider is unavailable, the ensemble falls back to the local model when enabled, otherwise it returns a clear error. This total-failure case is rare because multiple providers and keys are tried first.",
+    ),
+    (
+        "What file formats are supported as knowledge sources?",
+        "Text-based formats like .txt, .md, and .csv are indexed.",
+        "The knowledge base indexes text-based files: plain text, Markdown, and CSV are read directly and split into chunks. Binary formats like PDFs or images are not parsed. Keeping sources in simple text formats makes retrieval fast and predictable, at the cost of not supporting rich document types.",
+    ),
+    (
+        "How does the ensemble keep answers concise?",
+        "A clarity score penalizes answers that are too short or too long.",
+        "The clarity score rewards answers between roughly 35 and 280 words that use short paragraphs or bullet lists. Very short answers lack detail and score lower, while rambling answers lose focus and also score lower. The ensemble therefore tends to select candidates that state the main point first and keep supporting detail tight.",
+    ),
+]
+
+# Paraphrases for each question (aligned with DOMAIN_EXAMPLES by index). The
+# generator sees each concept asked many different ways, which forces it to
+# learn the underlying meaning instead of memorizing exact question strings.
+QUESTION_PARAPHRASES: List[List[str]] = [
+    [
+        "How does a multi-LLM ensemble improve answer quality?",
+        "In what way does combining multiple models make answers better?",
+        "Why is an ensemble of LLMs higher quality than a single model?",
+    ],
+    [
+        "Is local knowledge grounding useful for chat assistants?",
+        "Does grounding answers in local files help a chatbot?",
+        "What benefit do local sources give a chat assistant?",
+    ],
+    [
+        "Why is bias reduction important in AI answers?",
+        "Why does balanced framing matter in model responses?",
+        "How does presenting both sides reduce misleading answers?",
+    ],
+    [
+        "What is privacy redaction in this system?",
+        "How does the system hide sensitive data before calling APIs?",
+        "What happens to private information in prompts and replies?",
+    ],
+    [
+        "How are the candidate answers ranked?",
+        "What determines which candidate answer wins?",
+        "How are generated answers ordered by quality?",
+    ],
+    [
+        "Can I add my own documents to the system?",
+        "How do I load my own files as sources?",
+        "Is it possible to index my own text files for answers?",
+    ],
+    [
+        "Does the platform use renewable energy?",
+        "Is the service powered by green energy?",
+        "How does the platform track its carbon footprint?",
+    ],
+    [
+        "What happens if one provider fails during a query?",
+        "How are provider outages handled at runtime?",
+        "What occurs when a model call errors out?",
+    ],
+    [
+        "How do citations work in generated answers?",
+        "How are source references marked in replies?",
+        "What do the [S1], [S2] markers mean in answers?",
+    ],
+    [
+        "What is the difference between training and fine-tuning?",
+        "How does training from scratch differ from fine-tuning?",
+        "Which approach needs more data, training or fine-tuning?",
+    ],
+    [
+        "What makes an answer easy to understand?",
+        "How is answer clarity measured?",
+        "What structure makes a response most readable?",
+    ],
+    [
+        "How do I keep provider costs predictable?",
+        "What keeps API costs stable per question?",
+        "How are provider bills kept under control?",
+    ],
+    [
+        "What happens to answers that are too short?",
+        "How are brief responses scored?",
+        "Why do very short answers lose points on clarity?",
+    ],
+    [
+        "How are API keys protected in this platform?",
+        "Are API keys stored securely?",
+        "How are user credentials kept safe?",
+    ],
+    [
+        "Why does the ensemble use multiple providers?",
+        "Why not rely on a single model provider?",
+        "What is the benefit of several API providers?",
+    ],
+    [
+        "What should I do if an answer contains sensitive data?",
+        "How is private data removed from responses?",
+        "What happens when a reply leaks an identifier?",
+    ],
+    [
+        "Can the system answer without any local sources?",
+        "How does the system respond with no sources retrieved?",
+        "What happens when no local files match the question?",
+    ],
+    [
+        "What is the role of the synthesis step?",
+        "What does the judge do after candidates are ranked?",
+        "How are the top answers merged into one?",
+    ],
+    [
+        "How often should I retrain a custom model?",
+        "When is it time to retrain the models?",
+        "What cadence is recommended for retraining?",
+    ],
+    [
+        "What makes a source chunk easy to retrieve?",
+        "How are source paragraphs indexed and matched?",
+        "What improves retrieval accuracy for a source file?",
+    ],
+    [
+        "Does running locally reduce emissions?",
+        "Is local inference greener than cloud APIs?",
+        "How does on-device processing affect carbon usage?",
+    ],
+    [
+        "How does the ensemble handle conflicting answers from different models?",
+        "What happens when candidates disagree with each other?",
+        "How are contradictory model responses resolved?",
+    ],
+    [
+        "What types of questions work best with this ensemble?",
+        "Which kinds of queries give the best results?",
+        "What should I ask to get the most accurate answers?",
+    ],
+    [
+        "Can I customize the scoring weights for candidates?",
+        "Is the scoring formula adjustable?",
+        "How do I tune how answers are ranked?",
+    ],
+    [
+        "What happens during the synthesis step if candidates are very different?",
+        "How does the judge handle wildly different answers?",
+        "What if no two candidates agree on much?",
+    ],
+    [
+        "How does the system prevent leaking sensitive information?",
+        "How is data protected before it reaches a provider?",
+        "What prevents secrets from being sent to APIs?",
+    ],
+    [
+        "What is the purpose of the persona system?",
+        "Why do the bots use different personas?",
+        "What do the multiple personalities add to the ensemble?",
+    ],
+    [
+        "How are long documents handled in knowledge_sources?",
+        "How are large files processed for retrieval?",
+        "What happens to a big document in the source index?",
+    ],
+    [
+        "What metrics does the system track for each query?",
+        "Which scores are computed for every answer?",
+        "How is each response evaluated?",
+    ],
+    [
+        "How does the system handle ambiguous questions?",
+        "What happens when a question can be read multiple ways?",
+        "How are unclear prompts answered?",
+    ],
+    [
+        "What are the limits of the tiny local models?",
+        "How capable are the offline local models?",
+        "What can the small local generator not do well?",
+    ],
+    [
+        "How do multiple API keys get used?",
+        "How are several provider keys managed?",
+        "What happens when one API key runs out of quota?",
+    ],
+    [
+        "How is chat history handled between turns?",
+        "How much conversation context is kept?",
+        "What happens to old messages in a long chat?",
+    ],
+    [
+        "How does the ensemble choose which persona to use?",
+        "How are the bot personalities assigned?",
+        "Why do different bots use different instructions?",
+    ],
+    [
+        "How does retrieval decide which source chunks are relevant?",
+        "How are source paragraphs selected for a question?",
+        "What ranking decides which chunks are retrieved?",
+    ],
+    [
+        "What generation parameters control the bot output?",
+        "Which sampling settings shape each answer?",
+        "How does temperature affect generated responses?",
+    ],
+    [
+        "What happens if every provider fails at once?",
+        "What occurs when no provider can answer a query?",
+        "How is a total provider outage handled?",
+    ],
+    [
+        "What file formats are supported as knowledge sources?",
+        "Which document types can the index read?",
+        "Are PDF or Markdown files supported as sources?",
+    ],
+    [
+        "How does the ensemble keep answers concise?",
+        "Why do short and rambling answers score lower?",
+        "How is conciseness rewarded in scoring?",
+    ],
 ]
 
 # Uncertainty / tradeoff phrases that are spliced into answers.
@@ -159,11 +450,49 @@ def _grounded_answer(example: Tuple[str, str, str], source_id: str) -> str:
     question, snippet, skeleton = example
     marker = random.choice(UNCERTAINTY_MARKERS)
     tradeoff_a, tradeoff_b, tradeoff_desc = random.choice(TRADEOFF_PAIRS)
+    citation = f"[{source_id}] {snippet[:180]}"
+    detail = snippet[:300]
+    key_point = f"- {detail}"
+    close = random.choice(
+        [
+            "Conclusion: on balance, the sources support the practical answer above.",
+            "In short: the supported answer is the safe default, with the tradeoff noted above kept in mind.",
+        ]
+    )
+    if random.random() < 0.4:
+        # Copy-and-cite: answer paraphrases the source snippet almost verbatim
+        # and cites it, which teaches the generator to ground on retrieved text.
+        return (
+            f"According to [{source_id}], {detail}. "
+            f"{marker} The practical upshot is that {detail.lower()[:60]}... "
+            f"Key points:\n{key_point}\n\n"
+            f"Tradeoff: {tradeoff_desc}. Prefer {tradeoff_a} when {tradeoff_b} is not critical.\n"
+            f"{close}"
+        )
+    if random.random() < 0.5:
+        return (
+            f"{skeleton}\n\n{detail}\n\n"
+            f"Key points:\n{key_point}\n\n"
+            f"{citation}\n\n"
+            f"{marker}\n\nTradeoff: {tradeoff_desc}. Prefer {tradeoff_a} when {tradeoff_b} is not critical.\n"
+            f"{close}"
+        )
+    if random.random() < 0.5:
+        # Structured: use clear section headers for a well-organized answer.
+        return (
+            f"Summary: {skeleton}\n\n"
+            f"Details: {detail}\n\n"
+            f"Key points:\n{key_point}\n\n"
+            f"Tradeoff: {tradeoff_desc}. Prefer {tradeoff_a} when {tradeoff_b} is not critical.\n\n"
+            f"{citation}\n\n"
+            f"{marker}\n{close}"
+        )
+    # Reordered variant: lead with the tradeoff, then claim + citation + key points.
     return (
-        f"{skeleton}\n\n{snippet}\n\n"
-        f"[{source_id}] {snippet[:180]}\n\n"
-        f"{marker}\n\nTradeoff: {tradeoff_desc}. Prefer {tradeoff_a} when {tradeoff_b} is not critical.\n"
-        f"Conclusion: on balance, the sources support the practical answer above."
+        f"Tradeoff: {tradeoff_desc}. Prefer {tradeoff_a} when {tradeoff_b} is not critical.\n\n"
+        f"{skeleton}\n\n{citation}\n\n"
+        f"Key points:\n{key_point}\n\n"
+        f"{marker}\n{close}"
     )
 
 
@@ -187,19 +516,25 @@ def _vague_answer(example: Tuple[str, str, str]) -> str:
     )
 
 
-def build_lm_corpus(seed: int = 0, n_variants: int = 6) -> List[str]:
-    """Return chat-style training documents in the ensemble answer style."""
+def build_lm_corpus(seed: int = 0, n_variants: int = 60) -> List[str]:
+    """Return chat-style training documents in the ensemble answer style.
+
+    Mixes the synthetic domain examples with the real knowledge_sources/ docs
+    so the model learns to answer from the actual seed content it will retrieve.
+    """
     rng = random.Random(seed)
     docs: List[str] = []
     for round_num in range(n_variants):
         for idx, example in enumerate(DOMAIN_EXAMPLES):
             question, snippet, _ = example
+            paraphrase_set = QUESTION_PARAPHRASES[idx]
+            phrased = paraphrase_set[(round_num + idx) % len(paraphrase_set)]
             persona_name, persona_instruction = PERSONAS[idx % len(PERSONAS)]
             source_id = f"S{idx + 1}"
             body = _grounded_answer(example, source_id)
 
             user_turn = (
-                f"User request:\n{question}\n\n"
+                f"User request:\n{phrased}\n\n"
                 f"Local sources:\n[{source_id}] {snippet[:700]}\n\n"
                 f"Answer rules:\n- Use citations [S#] for factual statements when possible.\n"
                 f"- If a fact is unsupported, label it as uncertain.\n"
@@ -213,7 +548,54 @@ def build_lm_corpus(seed: int = 0, n_variants: int = 6) -> List[str]:
             )
             doc = f"<|user|>\n{user_turn}\n<|assistant|>\n{bot_turn}\n<|end|>\n"
             docs.append(doc)
+
+    docs.extend(_build_knowledge_docs())
     rng.shuffle(docs)
+    return docs
+
+
+def _build_knowledge_docs() -> List[str]:
+    """Build chat-style docs grounded in the real knowledge_sources/ files.
+
+    For every recognized .md file, one question about it is paired with the
+    file's full text as the retrieved source and a grounded answer. This teaches
+    the generator to answer from the exact content the RAG index retrieves.
+    """
+    import re
+
+    from ai_client import chunk_text
+
+    base = Path(__file__).resolve().parent.parent / "knowledge_sources"
+    if not base.exists():
+        return []
+
+    title_re = re.compile(r"^#\s+(.+)$", re.MULTILINE)
+    sections_re = re.compile(r"^##\s+(.+)$", re.MULTILINE)
+    docs: List[str] = []
+    for path in sorted(base.glob("*.md")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if not text.strip():
+            continue
+        title_match = title_re.search(text)
+        title = title_match.group(1).strip() if title_match else path.stem.replace("_", " ")
+        source_id = f"KS{len(docs) + 1}"
+        user_turn = (
+            f"User request:\nWhat does {title} say?\n\n"
+            f"Local sources:\n[{source_id}] {chunk_text(text, max_chars=1800)[0]}\n\n"
+            f"Answer rules:\n- Use citations [S#] for factual statements when possible.\n"
+            f"- If a fact is unsupported, label it as uncertain.\n"
+            f"- Avoid one-sided framing. Present tradeoffs.\n"
+            f"- Do not reveal sensitive identifiers.\n"
+        )
+        bot_turn = (
+            f"Persona: Factual Analyst. Prioritize precise facts and explicit assumptions.\n"
+            f"Keep final answer practical and concise.\n"
+            f"Bot answer:\n"
+            f"Per [{source_id}], {title} covers the following. {text.strip()[:900]}\n\n"
+            f"[{source_id}] This answer is grounded in the retrieved source. "
+            f"Some details depend on the exact setup, so treat them as approximate."
+        )
+        docs.append(f"<|user|>\n{user_turn}\n<|assistant|>\n{bot_turn}\n<|end|>\n")
     return docs
 
 
@@ -246,6 +628,46 @@ def build_scorer_examples(seed: int = 1) -> List[Tuple[str, float, float, float]
         # Long rambling -> low clarity
         long = ("In conclusion I would like to say that " + grounded + " " + grounded)[:600]
         rows.append((long, 0.7, 0.72, 0.5))
+
+        # Partially grounded -> mid source support
+        partial = (
+            f"Most of the answer is supported by [{source_id}]. "
+            f"Some claims depend on the exact setup, so treat them as approximate. "
+            f"{example[1]}"
+        )
+        rows.append((partial, 0.68, 0.75, 0.74))
+
+        # Biased without absolute words -> framing penalty, decent support
+        framing_biased = (
+            f"According to [{source_id}], this is the clearly superior approach. "
+            f"There is essentially one way to look at this, and the evidence points "
+            f"strongly in that direction without exception."
+        )
+        rows.append((framing_biased, 0.62, 0.42, 0.7))
+
+        # Overlong rambling with citations -> mid clarity, high support
+        verbose = (
+            f"According to [{source_id}], the answer involves many interrelated factors "
+            f"that must be carefully considered in sequence. First, consider the context "
+            f"and the surrounding details. Then reflect on how each factor interacts. "
+            f"After that, weigh the tradeoffs. Finally, arrive at a conclusion that takes "
+            f"everything into account. {grounded}"
+        )[:600]
+        rows.append((verbose, 0.75, 0.74, 0.55))
+
+        # Clear but unsupported -> low source support, high clarity
+        unsupported_clear = (
+            "This is a straightforward explanation of the topic. Here is what you need "
+            "to know in three clear points. First point. Second point. Third point."
+        )
+        rows.append((unsupported_clear, 0.3, 0.68, 0.8))
+
+        # Length-appropriate with citations -> best clarity
+        cited_clean = (
+            f"According to [{source_id}], {example[1]}. "
+            f"This is supported by the available sources, though edge cases may vary."
+        )
+        rows.append((cited_clean, 0.78, 0.82, 0.82))
 
     rng.shuffle(rows)
     return rows

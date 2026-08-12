@@ -299,9 +299,8 @@ def main() -> None:
 
     if not providers:
         st.error(
-            "No providers available. Add keys in "
-            "`/Users/imredavid/Downloads/ai_client/ai_client.py` "
-            "or set provider env vars."
+            "No providers available. Add keys in the project root "
+            "`ai_client.py` or set provider env vars."
         )
         st.stop()
 

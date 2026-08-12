@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import threading
 import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Protocol, Sequence, Set, Tuple
 """
@@ -202,6 +203,8 @@ class SourceChunk:
     path: Path
     text: str
     tokens: Set[str]
+    tf: Dict[str, int] = field(default_factory=dict)
+    length: int = 0
 
 
 @dataclass
@@ -241,6 +244,15 @@ class GenerationConfig:
     top_k: int | None = None
     max_tokens: int | None = None
     repetition_penalty: float | None = None
+
+
+def _translate_rep_penalty(value: float) -> float:
+    """Map a TinyGPT-style repetition penalty (1.0 = none) to an OpenAI/Mistral
+    frequency/presence penalty (0.0 = none, positive = discourage repetition).
+    """
+    if value <= 1.0:
+        return 0.0
+    return round(value - 1.0, 3)
 
 
 class RoundRobinKeys:
@@ -471,7 +483,7 @@ class OpenAIProvider:
         if gen_p.top_p is not None:
             kwargs["top_p"] = gen_p.top_p
         if gen_p.repetition_penalty is not None:
-            kwargs["frequency_penalty"] = gen_p.repetition_penalty
+            kwargs["frequency_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
             kwargs["presence_penalty"] = 0.0
         last_error = None
         for attempt in range(MAX_RETRIES):
@@ -497,9 +509,14 @@ class GeminiProvider:
         self.model = model
         self._keys = RoundRobinKeys(api_keys)
         self._model_candidates = self._build_model_candidates(model)
+        self._model_lock = threading.Lock()
 
     def size(self) -> int:
         return self._keys.size()
+
+    def _set_active_model(self, candidate_model: str) -> None:
+        with self._model_lock:
+            self.model = candidate_model
 
     @staticmethod
     def _build_model_candidates(primary_model: str) -> List[str]:
@@ -558,7 +575,7 @@ class GeminiProvider:
                     )
                     text = extract_gemini_text(data)
                     if text:
-                        self.model = candidate_model
+                        self._set_active_model(candidate_model)
                         return text
                     last_error = RuntimeError("Empty response from Gemini provider")
                 except Exception as exc:
@@ -602,16 +619,11 @@ class MistralProvider:
         if gen_p.max_tokens is not None:
             payload["max_tokens"] = gen_p.max_tokens
         if gen_p.repetition_penalty is not None:
-            payload["presence_penalty"] = gen_p.repetition_penalty
+            payload["presence_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
             payload["frequency_penalty"] = 0.0
         last_error = None
         for attempt in range(MAX_RETRIES):
             key = self._keys.next()
-            payload = {
-                "model": self.model,
-                "messages": list(messages),
-                "temperature": temperature,
-            }
             try:
                 data = http_post_json(
                     url="https://api.mistral.ai/v1/chat/completions",
@@ -738,11 +750,55 @@ def chunk_text(text: str, max_chars: int = 850) -> Iterable[str]:
     return chunks
 
 
+def _term_frequencies(tokens: Sequence[str]) -> Dict[str, int]:
+    tf: Dict[str, int] = {}
+    for token in tokens:
+        tf[token] = tf.get(token, 0) + 1
+    return tf
+
+
+def _compute_idf(chunks: Sequence[SourceChunk]) -> Dict[str, float]:
+    doc_count = len(chunks)
+    if doc_count == 0:
+        return {}
+    df: Dict[str, int] = {}
+    for chunk in chunks:
+        for token in chunk.tokens:
+            df[token] = df.get(token, 0) + 1
+    idf: Dict[str, float] = {}
+    for token, freq in df.items():
+        idf[token] = 1.0 + math.log(doc_count / (1.0 + freq))
+    return idf
+
+
+def _bm25_score(
+    chunk: SourceChunk,
+    q_tf: Dict[str, int],
+    idf: Dict[str, float],
+    avg_len: float,
+    k1: float = 1.5,
+    b: float = 0.75,
+) -> float:
+    if chunk.length == 0:
+        return 0.0
+    norm = 1.0 - b + b * (chunk.length / avg_len)
+    score = 0.0
+    for term, q_freq in q_tf.items():
+        if term not in chunk.tf:
+            continue
+        df = chunk.tf[term] * (k1 + 1.0) / (chunk.tf[term] + k1 * norm)
+        idf_term = idf.get(term, 1.5)
+        score += q_freq * idf_term * df
+    return score
+
+
 class SourceIndex:
     def __init__(self, source_dir: Path) -> None:
         self.source_dir = source_dir
         self.chunks: List[SourceChunk] = []
         self.loaded_files: List[Path] = []
+        self._idf: Dict[str, float] = {}
+        self._avg_len = 0.0
 
     def refresh(self) -> None:
         self.source_dir.mkdir(parents=True, exist_ok=True)
@@ -761,30 +817,41 @@ class SourceIndex:
                 continue
             loaded.append(path)
             for piece in chunk_text(text):
-                tokens = set(tokenize(piece))
+                tokens = tokenize(piece)
                 if not tokens:
                     continue
                 source_id = f"S{len(chunks) + 1}"
-                chunks.append(SourceChunk(source_id=source_id, path=path, text=piece, tokens=tokens))
+                chunks.append(
+                    SourceChunk(
+                        source_id=source_id,
+                        path=path,
+                        text=piece,
+                        tokens=set(tokens),
+                        tf=_term_frequencies(tokens),
+                        length=len(tokens),
+                    )
+                )
 
         self.chunks = chunks
         self.loaded_files = loaded
+        self._idf = _compute_idf(chunks)
+        if chunks:
+            self._avg_len = sum(c.length for c in chunks) / len(chunks)
 
     def retrieve(self, query: str, top_k: int = TOP_K_SOURCES) -> List[SourceChunk]:
         if not self.chunks:
             return []
-        q_tokens = set(tokenize(query))
+        q_tokens = tokenize(query)
         if not q_tokens:
             return []
 
+        q_tf = _term_frequencies(q_tokens)
         scored: List[Tuple[float, SourceChunk]] = []
+        avg_len = self._avg_len or 1.0
         for chunk in self.chunks:
-            overlap = len(q_tokens & chunk.tokens)
-            if overlap == 0:
+            score = _bm25_score(chunk, q_tf, self._idf, avg_len)
+            if score <= 0.0:
                 continue
-            precision = overlap / max(1, len(chunk.tokens))
-            recall = overlap / max(1, len(q_tokens))
-            score = (0.75 * recall) + (0.25 * precision)
             scored.append((score, chunk))
 
         scored.sort(key=lambda item: item[0], reverse=True)

@@ -15,6 +15,12 @@ export interface UserPrefs {
   totalQueries: number;
   totalCarbonSaved: number;
   createdAt: string;
+  notifications?: {
+    email: boolean;
+    push: boolean;
+    modelUpdates: boolean;
+    billing: boolean;
+  };
 }
 
 export interface ApiKey {

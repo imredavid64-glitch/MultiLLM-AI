@@ -70,6 +70,52 @@ class WordTokenizer:
         return cls(vocab)
 
 
+class CharacterTokenizer:
+    """Simple character-level tokenizer with special tokens."""
+
+    def __init__(self, vocab: Sequence[str]) -> None:
+        if "<|endoftext|>" not in vocab:
+            vocab = list(vocab) + ["<|endoftext|>"]
+        self.vocab = list(vocab)
+        self.stoi = {tok: i for i, tok in enumerate(self.vocab)}
+        self.itos = {i: tok for i, tok in enumerate(self.vocab)}
+        self.unk_idx = self.stoi.get("<|unk|>", 0)
+
+    @classmethod
+    def train(cls, texts: Sequence[str], vocab_size: int = 256) -> "CharacterTokenizer":
+        chars = set()
+        for text in texts:
+            chars.update(list(text))
+        specials = sorted(SPECIAL_TOKENS)
+        vocab = specials + sorted(chars - set(specials))
+        if len(vocab) > vocab_size:
+            vocab = vocab[:vocab_size]
+        return cls(vocab)
+
+    def encode(self, text: str) -> List[int]:
+        ids = []
+        for char in text:
+            idx = self.stoi.get(char)
+            ids.append(self.unk_idx if idx is None else idx)
+        return ids
+
+    def decode(self, ids: Sequence[int]) -> str:
+        return "".join(self.itos.get(i, "<|unk|>") for i in ids)
+
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
+
+    def save(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.vocab), encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: Path) -> "CharacterTokenizer":
+        vocab = json.loads(path.read_text(encoding="utf-8"))
+        return cls(vocab)
+
+
 class LayerNorm(nn.Module):
     def __init__(self, dim: int, eps: float = 1e-5) -> None:
         super().__init__()
@@ -182,6 +228,9 @@ class TinyGPT(nn.Module):
         top_k: int | None = 50,
         repetition_penalty: float = 1.15,
     ) -> torch.Tensor:
+        device = self.token_embedding.weight.device
+        if idx.device != device:
+            idx = idx.to(device)
         generated: List[int] = []
         for _ in range(max_new_tokens):
             idx_cond = idx if idx.size(1) <= self.block_size else idx[:, -self.block_size :]
@@ -230,8 +279,13 @@ class TinyGPT(nn.Module):
             n_head=cfg["n_head"],
             n_embd=cfg["n_embd"],
         )
-        model.load_state_dict(torch.load(dir_path / "model.pt", map_location=device))
+        # Load on CPU first: torch.load(map_location="mps") triggers the
+        # "Placeholder storage has not been allocated on MPS device" bug for
+        # checkpoints saved mid-training on MPS. Moving after loading avoids it.
+        model.load_state_dict(torch.load(dir_path / "model.pt", map_location="cpu"))
         model.eval()
+        if device != "cpu":
+            model = model.to(device)
         return model
 
 
@@ -305,6 +359,8 @@ class TinyScorer(nn.Module):
             n_layer=cfg["n_layer"],
             n_head=cfg["n_head"],
         )
-        model.load_state_dict(torch.load(dir_path / "model.pt", map_location=device))
+        model.load_state_dict(torch.load(dir_path / "model.pt", map_location="cpu"))
         model.eval()
+        if device != "cpu":
+            model = model.to(device)
         return model
