@@ -14,6 +14,7 @@
     "docs:generate": "node scripts/generate-docs.js"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "appwrite": "^16.0.2",
     "axios": "^1.6.2",
     "clsx": "^1.2.1",
