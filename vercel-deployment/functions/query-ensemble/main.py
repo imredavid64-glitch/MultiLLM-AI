@@ -15,6 +15,7 @@ from ai_client import (
     build_provider_stack,
     SourceIndex,
     build_ensemble_answer,
+    maybe_refine_prompt,
     GenerationConfig,
     format_sources_for_user,
     format_provider_status,
@@ -55,23 +56,26 @@ class QueryResponse(BaseModel):
     sources: List[Dict[str, Any]]
     metrics: Dict[str, float]
     provider_status: str
+    refined_prompt: Optional[str] = None
+    token_savings: Optional[Dict[str, float]] = None
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_ensemble(request: QueryRequest):
     if not providers:
         raise HTTPException(status_code=503, detail="No providers configured. Set API keys.")
-    
+
     bot_count = request.bot_count or BOT_COUNT
     bot_count = max(2, min(MAX_PARALLEL_BOTS, bot_count))
-    
+
     privacy_redaction = request.privacy_redaction if request.privacy_redaction is not None else PRIVACY_REDACTION
-    
+
     try:
-        sources = source_index.retrieve(request.prompt, top_k=request.top_k or 6)
-        answer, candidates = build_ensemble_answer(
+        refined_prompt = maybe_refine_prompt(request.prompt)
+        sources = source_index.retrieve(refined_prompt, top_k=request.top_k or 6)
+        answer, candidates, token_savings = build_ensemble_answer(
             providers=providers,
             history=[],
-            user_input=request.prompt,
+            user_input=refined_prompt,
             sources=sources,
             bot_count=bot_count,
             privacy_redaction=privacy_redaction,
@@ -102,6 +106,8 @@ async def query_ensemble(request: QueryRequest):
                 "top_score": round(candidates[0].total_score, 3) if candidates else 0,
             },
             provider_status=format_provider_status(providers),
+            refined_prompt=refined_prompt if refined_prompt != request.prompt else None,
+            token_savings=token_savings,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

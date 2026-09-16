@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { MultiLLM } from "@/lib/multi-llm";
 import { getProfile, decrementCredits } from "@/lib/supabase/services";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
+import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,12 +34,13 @@ async function callPythonEnsemble(prompt: string, options: any = {}) {
 export async function POST(req: NextRequest) {
   let prompt = "";
   let options = {};
-  let userId = "";
 
-  // Programmatic access via a generated API key takes precedence over a
-  // body-supplied user_id (which is only trusted for the dashboard's own
-  // logged-in session).
+  // Programmatic access via a generated API key takes precedence over the
+  // dashboard's own logged-in session. Neither is ever taken from the
+  // request body -- that would let a caller claim any user_id they like.
   const apiKeyAuth = await authenticateApiKey(req);
+  const sessionUserId = apiKeyAuth ? null : await getAuthenticatedUserId();
+  const userId = apiKeyAuth?.userId || sessionUserId || "";
 
   try {
     const body = await req.json();
@@ -48,7 +50,6 @@ export async function POST(req: NextRequest) {
       top_k: body?.top_k,
       privacy_redaction: body?.privacy_redaction,
     };
-    userId = apiKeyAuth?.userId || body?.user_id || "";
   } catch {
     // fall through
   }
@@ -74,6 +75,8 @@ export async function POST(req: NextRequest) {
   let metrics: any;
   let candidates: any[] = [];
   let sources: any[] = [];
+  let tokenSavings: Record<string, number> | null = null;
+  let refinedPrompt: string | null = null;
 
   if (pythonResult) {
     answer = pythonResult.answer;
@@ -85,6 +88,8 @@ export async function POST(req: NextRequest) {
     };
     candidates = pythonResult.candidates || [];
     sources = pythonResult.sources || [];
+    tokenSavings = pythonResult.token_savings || null;
+    refinedPrompt = pythonResult.refined_prompt || null;
   } else {
     // Fallback to mock
     const result = await multiLLM.query(prompt);
@@ -122,6 +127,8 @@ export async function POST(req: NextRequest) {
     _source: pythonResult ? "python-ensemble" : "mock",
     _candidates: candidates,
     _sources: sources,
+    token_savings: tokenSavings,
+    refined_prompt: refinedPrompt,
   });
 }
 

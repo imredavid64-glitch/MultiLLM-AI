@@ -70,7 +70,7 @@ export default function BillingPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, plan: tierId }),
+        body: JSON.stringify({ plan: tierId }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || "Checkout failed");
@@ -92,7 +92,6 @@ export default function BillingPage() {
       const res = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing portal");

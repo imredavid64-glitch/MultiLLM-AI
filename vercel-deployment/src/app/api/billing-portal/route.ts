@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSubscription } from "@/lib/supabase/services";
+import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +21,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const userId = typeof body?.user_id === "string" ? body.user_id : "";
+  const userId = await getAuthenticatedUserId();
   if (!userId) {
-    return NextResponse.json({ error: "Missing user_id" }, { status: 400 });
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const subscription = await getSubscription(userId);

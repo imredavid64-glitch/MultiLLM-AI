@@ -62,7 +62,7 @@ def run_one(prompt: str, bot_count: int, privacy: bool, gen_cfg: "GenerationConf
     try:
         start = time.perf_counter()
         sources = []  # Disable RAG - use direct AI response
-        answer, candidates = build_ensemble_answer(
+        answer, candidates, token_savings = build_ensemble_answer(
             providers=st.session_state.test_providers,
             history=[],
             user_input=prompt,

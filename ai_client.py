@@ -987,6 +987,23 @@ def generate_candidate(
     return provider.chat(messages=messages, temperature=gen_p.temperature, gen_p=gen_p)
 
 
+def maybe_refine_prompt(user_input: str) -> str:
+    """Best-effort "AI helping the prompt" pre-processing step.
+
+    Runs the trained prompt-refiner TinyGPT (see train/prompt_refiner_data.py)
+    on the raw user prompt before it reaches retrieval or the bot personas.
+    Returns the input unchanged whenever the trained model isn't available or
+    refinement fails -- this must never block a query.
+    """
+    try:
+        from local_models import refine_prompt
+
+        refined = refine_prompt(user_input)
+        return refined or user_input
+    except Exception:
+        return user_input
+
+
 def build_ensemble_answer(
     providers: Sequence[ChatProvider],
     history: Sequence[Dict[str, str]],
@@ -995,7 +1012,16 @@ def build_ensemble_answer(
     bot_count: int,
     privacy_redaction: bool,
     gen_p: "GenerationConfig" = GenerationConfig(),
-) -> Tuple[str, List[Candidate]]:
+) -> Tuple[str, List[Candidate], Dict[str, float]]:
+    from token_optimizer import optimize_context
+
+    # Trim once per query, reused by every parallel bot call below -- the
+    # real saving is this trimmed context times bot_count, not just once.
+    optimized = optimize_context(sources, history)
+    sources = optimized.sources
+    history = optimized.history
+    token_savings = optimized.savings.as_dict()
+
     source_context = format_sources_for_prompt(sources)
     bot_configs = select_bot_configs(bot_count)
     if not providers:
@@ -1100,7 +1126,7 @@ def build_ensemble_answer(
     if detect_sensitive_hits(final_answer):
         final_answer = redact_sensitive(final_answer)
 
-    return final_answer.strip(), successful
+    return final_answer.strip(), successful, token_savings
 
 
 def print_help() -> None:
@@ -1225,11 +1251,15 @@ def main() -> None:
                     )
                     print("The prompt will be redacted before it is sent to remote APIs.")
 
-            retrieved_sources = source_index.retrieve(user_input, top_k=TOP_K_SOURCES)
-            answer, candidates = build_ensemble_answer(
+            refined_input = maybe_refine_prompt(user_input)
+            if refined_input != user_input:
+                print(f"(refined prompt: {refined_input})")
+
+            retrieved_sources = source_index.retrieve(refined_input, top_k=TOP_K_SOURCES)
+            answer, candidates, token_savings = build_ensemble_answer(
                 providers=providers,
                 history=chat_history,
-                user_input=user_input,
+                user_input=refined_input,
                 sources=retrieved_sources,
                 bot_count=bot_count,
                 privacy_redaction=runtime_flags["privacy_redaction"],
@@ -1237,6 +1267,11 @@ def main() -> None:
 
             print("\nAI:")
             print(answer)
+            if token_savings["tokens_saved"] > 0:
+                print(
+                    f"(context optimizer: ~{token_savings['tokens_saved']} tokens saved "
+                    f"per bot call, {token_savings['tokens_saved_pct']}%)"
+                )
             print("\nSource checks:")
             print(format_sources_for_user(retrieved_sources))
             print("\nResponse checks:")

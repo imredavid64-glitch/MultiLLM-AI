@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { getProfile, getSubscription, upsertSubscription } from "@/lib/supabase/services";
+import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,12 +26,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
   }
 
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => ({}));
-  const userId = typeof body?.user_id === "string" ? body.user_id : "";
   const plan = body?.plan as "pro" | "enterprise";
 
-  if (!userId || !plan || !PRICE_IDS[plan]) {
-    return NextResponse.json({ error: "Missing or invalid user_id/plan" }, { status: 400 });
+  if (!plan || !PRICE_IDS[plan]) {
+    return NextResponse.json({ error: "Missing or invalid plan" }, { status: 400 });
   }
 
   const profile = await getProfile(userId);

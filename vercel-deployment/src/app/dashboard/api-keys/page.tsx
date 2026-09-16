@@ -36,7 +36,7 @@ export default function ApiKeysPage() {
     if (!userId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/api-keys?user_id=${encodeURIComponent(userId)}`);
+      const res = await fetch("/api/api-keys");
       const data = await res.json();
       setKeys(data.keys || []);
     } catch {
@@ -62,7 +62,7 @@ export default function ApiKeysPage() {
       const res = await fetch("/api/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, name: newKeyName, tier: newKeyTier }),
+        body: JSON.stringify({ name: newKeyName, tier: newKeyTier }),
       });
       if (!res.ok) throw new Error("Request failed");
       const created = await res.json();
@@ -93,7 +93,7 @@ export default function ApiKeysPage() {
     if (!confirm("Are you sure you want to delete this API key? This cannot be undone.")) return;
 
     try {
-      const res = await fetch(`/api/api-keys/${id}?user_id=${encodeURIComponent(userId)}`, {
+      const res = await fetch(`/api/api-keys/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Request failed");

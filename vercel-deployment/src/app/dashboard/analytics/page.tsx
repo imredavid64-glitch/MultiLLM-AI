@@ -56,7 +56,7 @@ export default function AnalyticsPage() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/analytics?user_id=${encodeURIComponent(userId)}`);
+        const res = await fetch("/api/analytics");
         const json = await res.json();
         setData({ ...EMPTY, ...json });
       } catch {

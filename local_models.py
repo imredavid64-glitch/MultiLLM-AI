@@ -19,8 +19,10 @@ BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
 GENERATOR_DIR = MODELS_DIR / "ensemble-generator"
 SCORER_DIR = MODELS_DIR / "ensemble-scorer"
+REFINER_DIR = MODELS_DIR / "prompt-refiner"
 TOKENIZER_PATH = MODELS_DIR / "tokenizer.json"
 SCORER_TOKENIZER_PATH = MODELS_DIR / "scorer-tokenizer.json"
+REFINER_TOKENIZER_PATH = MODELS_DIR / "refiner-tokenizer.json"
 
 
 class LocalModels:
@@ -32,6 +34,8 @@ class LocalModels:
         self._scorer_tokenizer = None
         self._generator = None
         self._scorer = None
+        self._refiner_tokenizer = None
+        self._refiner = None
 
     def available(self) -> bool:
         return (
@@ -40,6 +44,9 @@ class LocalModels:
             and TOKENIZER_PATH.exists()
             and SCORER_TOKENIZER_PATH.exists()
         )
+
+    def refiner_available(self) -> bool:
+        return REFINER_DIR.exists() and REFINER_TOKENIZER_PATH.exists()
 
     def _pick_device(self) -> str:
         if self.device != "auto":
@@ -86,6 +93,20 @@ class LocalModels:
     def generator_info(self) -> Dict:
         cfg = json.loads((GENERATOR_DIR / "config.json").read_text(encoding="utf-8"))
         return cfg
+
+    def refiner_tokenizer(self):
+        if self._refiner_tokenizer is None:
+            from train.model import WordTokenizer
+
+            self._refiner_tokenizer = WordTokenizer.load(REFINER_TOKENIZER_PATH)
+        return self._refiner_tokenizer
+
+    def refiner(self):
+        if self._refiner is None:
+            from train.model import TinyGPT
+
+            self._refiner = TinyGPT.load(REFINER_DIR, device=self._pick_device())
+        return self._refiner
 
 
 def _build_local_prompt(messages: Sequence[Dict[str, str]]) -> str:
@@ -188,6 +209,45 @@ class LocalTransformerProvider:
             if idx != -1:
                 text = text[:idx]
         return text.strip() or "(local model produced an empty candidate)"
+
+
+def refine_prompt(raw_prompt: str, max_new_tokens: int = 40) -> str:
+    """Rewrite a rough user prompt into a clearer one with the trained refiner.
+
+    "AI helping the prompt": a small TinyGPT trained on (rough -> clear)
+    question pairs runs before the ensemble, so retrieval and the bot
+    personas see a better-phrased question. Falls back to the original
+    prompt unchanged whenever the trained model is missing or generation
+    fails -- this step must never block a query.
+    """
+    raw_prompt = (raw_prompt or "").strip()
+    if not raw_prompt or not _LOCAL.refiner_available():
+        return raw_prompt
+
+    try:
+        from ai_client import redact_sensitive
+
+        tokenizer = _LOCAL.refiner_tokenizer()
+        model = _LOCAL.refiner()
+
+        seed_prompt = f"<|user|>\nRaw prompt:\n{redact_sensitive(raw_prompt)}\n<|assistant|>\nRefined prompt:\n"
+        seed_ids = tokenizer.encode(seed_prompt)
+
+        import torch
+
+        device = next(model.parameters()).device
+        seed = torch.tensor([seed_ids], dtype=torch.long, device=device)
+        with torch.no_grad():
+            out = model.generate(seed, max_new_tokens=max_new_tokens, temperature=0.3, top_k=20, repetition_penalty=1.2)
+        text = tokenizer.decode(out[0].tolist()[len(seed_ids):])
+        for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
+            idx = text.find(marker)
+            if idx != -1:
+                text = text[:idx]
+        text = text.strip()
+        return text or raw_prompt
+    except Exception:
+        return raw_prompt
 
 
 def model_score_answer(

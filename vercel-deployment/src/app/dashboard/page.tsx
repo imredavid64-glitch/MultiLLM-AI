@@ -37,7 +37,7 @@ export default function DashboardPage() {
     if (!userId) return;
     (async () => {
       try {
-        const res = await fetch(`/api/analytics?user_id=${encodeURIComponent(userId)}`);
+        const res = await fetch("/api/analytics");
         const json = await res.json();
         if (json.totals) setTotals(json.totals);
       } catch {

@@ -5,6 +5,7 @@ import {
   getPlatformApiKeys,
 } from "@/lib/supabase/services";
 import { hashApiKey, KEY_PREFIX_LENGTH } from "@/lib/apiKeyAuth";
+import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,9 +18,9 @@ function generatePlatformKey(tier: Tier): string {
 }
 
 export async function GET(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get("user_id") || "";
+  const userId = await getAuthenticatedUserId();
   if (!userId) {
-    return NextResponse.json({ error: "Missing user_id" }, { status: 400 });
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const keys = await getPlatformApiKeys(userId);
@@ -37,13 +38,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => ({}));
-  const userId = typeof body?.user_id === "string" ? body.user_id : "";
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const tier: Tier = VALID_TIERS.includes(body?.tier) ? body.tier : "free";
 
-  if (!userId || !name) {
-    return NextResponse.json({ error: "Missing user_id or name" }, { status: 400 });
+  if (!name) {
+    return NextResponse.json({ error: "Missing name" }, { status: 400 });
   }
 
   const plaintextKey = generatePlatformKey(tier);

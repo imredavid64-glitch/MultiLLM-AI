@@ -280,7 +280,7 @@ class HydraDesktopApp(tk.Tk):
         try:
             bot_count = max(2, min(8, int(self.bot_count_var.get())))
             sources: List[SourceChunk] = self.source_index.retrieve(prompt)
-            answer, candidates = build_ensemble_answer(
+            answer, candidates, token_savings = build_ensemble_answer(
                 providers=self.providers,
                 history=self.chat_history,
                 user_input=prompt,
