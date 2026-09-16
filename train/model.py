@@ -130,6 +130,8 @@ class LayerNorm(nn.Module):
 
 
 class SelfAttention(nn.Module):
+    causal_mask: torch.Tensor
+
     def __init__(self, n_embd: int, n_head: int, block_size: int, dropout: float) -> None:
         super().__init__()
         assert n_embd % n_head == 0
@@ -195,6 +197,7 @@ class TinyGPT(nn.Module):
         super().__init__()
         self.block_size = block_size
         self.n_embd = n_embd
+        self.n_head = n_head
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
         self.position_embedding = nn.Embedding(block_size, n_embd)
         self.blocks = nn.ModuleList(
@@ -260,7 +263,7 @@ class TinyGPT(nn.Module):
                     "vocab_size": self.token_embedding.num_embeddings,
                     "block_size": self.block_size,
                     "n_layer": len(self.blocks),
-                    "n_head": self.blocks[0].attn.n_head if self.blocks else 0,
+                    "n_head": self.n_head,
                     "n_embd": self.n_embd,
                     "kind": "generator",
                 },
@@ -341,7 +344,7 @@ class TinyScorer(nn.Module):
                     "block_size": self.block_size,
                     "n_embd": self.n_embd,
                     "n_layer": len(self.blocks),
-                    "n_head": self.blocks[0].attn.n_head if self.blocks else 0,
+                    "n_head": self.n_head,
                     "kind": "scorer",
                 },
                 indent=1,

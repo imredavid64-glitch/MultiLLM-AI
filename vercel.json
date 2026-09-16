@@ -11,10 +11,5 @@
       "src": "/(.*)",
       "dest": "vercel-deployment/$1"
     }
-  ],
-  "env": {
-    "APPWRITE_ENDPOINT": "https://your-appwrite-instance.com",
-    "APPWRITE_PROJECT_ID": "your-project-id",
-    "APPWRITE_API_KEY": "your-api-key"
-  }
+  ]
 }

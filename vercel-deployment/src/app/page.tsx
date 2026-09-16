@@ -200,7 +200,7 @@ export default function HomePage() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">Why MultiLLM?</h2>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            Single models hallucinate. Ensembles don't. We run your prompt across multiple providers and score every response.
+            Single models hallucinate. Ensembles don&apos;t. We run your prompt across multiple providers and score every response.
           </p>
         </div>
         

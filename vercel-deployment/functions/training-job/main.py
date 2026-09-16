@@ -11,10 +11,27 @@ from typing import Optional, Dict, Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="MultiLLM Training API")
+
+# Internal-only Vercel function -- called by this project's own Next.js API
+# routes server-side, never directly by a browser. Reject anything that
+# doesn't present the shared secret.
+INTERNAL_API_SECRET = os.environ.get("INTERNAL_API_SECRET", "")
+
+
+@app.middleware("http")
+async def require_internal_secret(request: Request, call_next):
+    if request.url.path == "/api/health":
+        return await call_next(request)
+    provided = request.headers.get("x-internal-secret", "")
+    if not INTERNAL_API_SECRET or provided != INTERNAL_API_SECRET:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
+
 
 training_jobs: Dict[str, Dict[str, Any]] = {}
 

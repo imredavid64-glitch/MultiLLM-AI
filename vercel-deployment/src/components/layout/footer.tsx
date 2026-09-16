@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function Footer() {
   return (
     <footer className="bg-slate-900 text-slate-400">
@@ -9,9 +11,13 @@ export default function Footer() {
             <p className="text-white font-semibold">MultiLLM</p>
             <p className="text-sm mt-1">Unified sustainable AI platform</p>
           </div>
-          <div className="text-sm">
+          <div className="text-sm flex flex-col md:items-end gap-2">
+            <div className="flex gap-4">
+              <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            </div>
             <p>© {new Date().getFullYear()} MultiLLM. All rights reserved.</p>
-            <p className="mt-1">Zero-carbon · Privacy-first · Multi-language</p>
+            <p>Zero-carbon · Privacy-first · Multi-language</p>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -10,27 +11,32 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Protocol, Sequence, Set, Tuple
+from types import ModuleType
+from typing import Any, Dict, Iterable, List, Protocol, Sequence, Set, Tuple
 """
 OPENAI API KEY used from OPENROUTER, and a GEMINI API KEY used from GOOGLE AI STUDIO
 """
 try:
-    from openai import OpenAI
+    from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 except Exception:
     print("Install/upgrade the OpenAI SDK first: pip install -U openai")
     raise
 
+httpx: "ModuleType | None"
 try:
-    from openai import APIError, APITimeoutError, RateLimitError
-except Exception:
-    APIError = Exception
-    APITimeoutError = Exception
-    RateLimitError = Exception
+    import httpx as _httpx
 
-try:
-    import httpx
+    httpx = _httpx
 except Exception:
     httpx = None
+
+# Library logging: attach a NullHandler so importing this module (e.g. from
+# the FastAPI query-ensemble function) produces zero output by default --
+# the host application configures real handlers/levels if it wants any.
+# main() below turns on console output when run as the interactive CLI.
+logger = logging.getLogger("ai_client")
+if not logger.handlers:
+    logger.addHandler(logging.NullHandler())
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -230,7 +236,7 @@ class ChatProvider(Protocol):
         self,
         messages: Sequence[Dict[str, str]],
         temperature: float,
-        gen: "GenerationConfig | None" = None,
+        gen_p: "GenerationConfig | None" = None,
     ) -> str:
         ...
 
@@ -451,12 +457,10 @@ class OpenAIProvider:
         self.model = model
         self.base_url = base_url.strip()
         self.name = "OpenRouter (OpenAI API)" if "openrouter.ai" in self.base_url else "OpenAI-compatible"
-        self._clients = []
+        self._clients: List[OpenAI] = []
         for key in api_keys:
-            kwargs = {"api_key": key}
-            if self.base_url:
-                kwargs["base_url"] = self.base_url
-            self._clients.append(OpenAI(**kwargs))
+            client = OpenAI(api_key=key, base_url=self.base_url) if self.base_url else OpenAI(api_key=key)
+            self._clients.append(client)
         self._cursor = 0
         self._lock = threading.Lock()
 
@@ -475,7 +479,7 @@ class OpenAIProvider:
         temperature: float,
         gen_p: "GenerationConfig | None" = None,
     ) -> str:
-        kwargs = {"model": self.model, "messages": list(messages), "temperature": temperature}
+        kwargs: Dict[str, Any] = {"model": self.model, "messages": list(messages), "temperature": temperature}
         if gen_p is None:
             gen_p = GenerationConfig(temperature=temperature)
         if gen_p.max_tokens is not None:
@@ -485,7 +489,7 @@ class OpenAIProvider:
         if gen_p.repetition_penalty is not None:
             kwargs["frequency_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
             kwargs["presence_penalty"] = 0.0
-        last_error = None
+        last_error: Exception | None = None
         for attempt in range(MAX_RETRIES):
             client = self._next_client()
             try:
@@ -496,10 +500,13 @@ class OpenAIProvider:
                 last_error = RuntimeError("Empty response from OpenAI-compatible provider")
             except (RateLimitError, APITimeoutError, APIError) as exc:
                 last_error = exc
+                logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
                 time.sleep(2 ** attempt)
             except Exception as exc:
                 last_error = exc
+                logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
                 time.sleep(2 ** attempt)
+        logger.error("%s call failed after %d retries: %s", self.name, MAX_RETRIES, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
 
@@ -554,15 +561,15 @@ class GeminiProvider:
             gen_config["topK"] = gen_p.top_k
         if gen_p.max_tokens is not None:
             gen_config["maxOutputTokens"] = gen_p.max_tokens
-        last_error = None
+        last_error: Exception | None = None
         for candidate_model in self._model_candidates:
             model_name = urllib.parse.quote(candidate_model, safe="")
             for attempt in range(MAX_RETRIES):
                 key = self._keys.next()
-                url = (
-                    f"https://generativelanguage.googleapis.com/v1beta/models/"
-                    f"{model_name}:generateContent?key={urllib.parse.quote(key, safe='')}"
-                )
+                # Key goes in a header, not the URL query string, so it never
+                # ends up in a server/proxy access log or an error message
+                # that happens to echo the request URL.
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
                 payload = {
                     "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                     "generationConfig": gen_config,
@@ -571,7 +578,7 @@ class GeminiProvider:
                     data = http_post_json(
                         url=url,
                         payload=payload,
-                        headers={"Content-Type": "application/json"},
+                        headers={"Content-Type": "application/json", "x-goog-api-key": key},
                     )
                     text = extract_gemini_text(data)
                     if text:
@@ -580,6 +587,9 @@ class GeminiProvider:
                     last_error = RuntimeError("Empty response from Gemini provider")
                 except Exception as exc:
                     last_error = exc
+                    logger.warning(
+                        "%s (%s) attempt %d/%d failed: %s", self.name, candidate_model, attempt + 1, MAX_RETRIES, exc
+                    )
                     # If the model itself is unavailable, skip to the next model candidate.
                     if "HTTP 404" in str(exc) and "models/" in str(exc):
                         break
@@ -587,6 +597,7 @@ class GeminiProvider:
                     if "HTTP 429" in str(exc) or "HTTP 401" in str(exc) or "HTTP 403" in str(exc):
                         break
                     time.sleep(2 ** attempt)
+        logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
 
@@ -621,7 +632,7 @@ class MistralProvider:
         if gen_p.repetition_penalty is not None:
             payload["presence_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
             payload["frequency_penalty"] = 0.0
-        last_error = None
+        last_error: Exception | None = None
         for attempt in range(MAX_RETRIES):
             key = self._keys.next()
             try:
@@ -639,11 +650,24 @@ class MistralProvider:
                 last_error = RuntimeError("Empty response from Mistral provider")
             except Exception as exc:
                 last_error = exc
+                logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
                 time.sleep(2 ** attempt)
+        logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
 
-def build_provider_stack() -> List[ChatProvider]:
+def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> List[ChatProvider]:
+    """Build the provider stack, preferring a caller's own keys per-provider.
+
+    `user_keys` (e.g. {"openai": [...], "gemini": [...], "openrouter": [...]})
+    lets a multi-tenant caller (the SaaS) run a query against a specific
+    user's own BYO provider keys instead of this process's platform keys.
+    Any provider the caller hasn't supplied a key for still falls back to the
+    platform's env-configured keys, so the ensemble stays multi-provider even
+    for a user who only connected one of their own keys. Never log the
+    contents of `user_keys`.
+    """
+    user_keys = user_keys or {}
     providers: List[ChatProvider] = []
 
     try:
@@ -651,10 +675,10 @@ def build_provider_stack() -> List[ChatProvider]:
 
         if LocalTransformerProvider().size():
             providers.append(LocalTransformerProvider())
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Local model provider unavailable: %s", exc)
 
-    openai_keys = load_keys_from_env(
+    openai_keys = user_keys.get("openai") or user_keys.get("openrouter") or load_keys_from_env(
         multi_env="OPENAI_API_KEYS",
         single_env="OPENAI_API_KEY",
         file_env="OPENAI_API_KEYS_FILE",
@@ -666,7 +690,7 @@ def build_provider_stack() -> List[ChatProvider]:
             openai_model = DEFAULT_OPENROUTER_MODEL if "openrouter.ai" in base_url else DEFAULT_OPENAI_MODEL
         providers.append(OpenAIProvider(api_keys=openai_keys, model=openai_model, base_url=base_url))
 
-    gemini_keys = load_keys_from_env(
+    gemini_keys = user_keys.get("gemini") or load_keys_from_env(
         multi_env="GEMINI_API_KEYS",
         single_env="GEMINI_API_KEY",
         file_env="GEMINI_API_KEYS_FILE",
@@ -675,7 +699,7 @@ def build_provider_stack() -> List[ChatProvider]:
         gemini_model = os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
         providers.append(GeminiProvider(api_keys=gemini_keys, model=gemini_model))
 
-    mistral_keys = load_keys_from_env(
+    mistral_keys = user_keys.get("mistral") or load_keys_from_env(
         multi_env="MISTRAL_API_KEYS",
         single_env="MISTRAL_API_KEY",
         file_env="MISTRAL_API_KEYS_FILE",
@@ -701,8 +725,8 @@ def load_chat_history() -> List[Dict[str, str]]:
                 data = json.load(handle)
             if isinstance(data, list):
                 return [msg for msg in data if isinstance(msg, dict) and "role" in msg and "content" in msg]
-        except Exception:
-            print("Warning: failed to load chat history. Starting with a clean history.")
+        except Exception as exc:
+            logger.warning("Failed to load chat history, starting clean: %s", exc)
     return []
 
 
@@ -725,7 +749,7 @@ def read_source_text(path: Path) -> str:
     return normalize_whitespace(raw)
 
 
-def chunk_text(text: str, max_chars: int = 850) -> Iterable[str]:
+def chunk_text(text: str, max_chars: int = 850) -> List[str]:
     if not text:
         return []
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
@@ -933,7 +957,7 @@ def clarity_score(answer: str) -> float:
 
 
 def select_bot_configs(bot_count: int) -> List[Tuple[str, str]]:
-    configs = []
+    configs: List[Tuple[str, str]] = []
     idx = 0
     while len(configs) < bot_count:
         persona = BOT_PERSONAS[idx % len(BOT_PERSONAS)]
@@ -1200,6 +1224,11 @@ def handle_command(
 
 
 def main() -> None:
+    # Only the interactive CLI configures a real handler -- as a library
+    # (e.g. imported by the FastAPI query-ensemble function) this module
+    # stays silent by default via the NullHandler set up above.
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+
     providers = build_provider_stack()
     if not providers:
         print("No provider API keys found.")

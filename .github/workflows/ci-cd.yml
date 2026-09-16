@@ -35,7 +35,6 @@ jobs:
         run: |
           pip install -U pip
           pip install openai httpx torch numpy pytest pytest-cov black ruff mypy
-          pip install -e .
       
       - name: Run Python linting (ruff)
         run: |
@@ -47,11 +46,11 @@ jobs:
       
       - name: Run Python type checking (mypy)
         run: |
-          mypy ai_client.py local_models.py train/ --ignore-missing-imports || true
-      
+          mypy ai_client.py local_models.py train/ token_optimizer.py --ignore-missing-imports
+
       - name: Run Python tests
         run: |
-          pytest -v || true
+          pytest -v
 
   # Next.js build and test
   nextjs-build:
@@ -148,7 +147,7 @@ jobs:
   # Deploy to Vercel (on main branch)
   deploy-vercel:
     name: Deploy to Vercel
-    needs: [nextjs-build, python-functions-test, training-function-test]
+    needs: [nextjs-build, python-functions-test, training-function-test, secret-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -192,17 +191,46 @@ jobs:
       - name: Run npm audit
         run: |
           cd vercel-deployment
-          npm audit --audit-level=high || true
-      
+          npm audit --audit-level=high
+
       - name: Run pip-audit
         run: |
           pip install pip-audit
-          pip-audit || true
+          pip-audit
+
+  # Reject commits containing real secrets or unresolved config placeholders
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for committed secrets
+        run: |
+          set -e
+          PATTERN='sk-[A-Za-z0-9]{20,}|sk-or-v1-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,}'
+          if grep -rEn --binary-files=without-match \
+              --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git \
+              --exclude-dir=models --exclude='package-lock.json' \
+              -E "$PATTERN" . ; then
+            echo "::error::Potential secret detected in the repository (see matches above)."
+            exit 1
+          fi
+          echo "No secret-shaped strings found."
+
+      - name: Reject unresolved placeholder values in committed config
+        run: |
+          set -e
+          if grep -rEn "your-appwrite-instance\.com|your-project-id|your-api-key|your-vercel-app\.vercel\.app" --include='vercel.json' . ; then
+            echo "::error::Placeholder values found in committed vercel.json -- replace with real env var references before deploying."
+            exit 1
+          fi
+          echo "No unresolved placeholders found."
 
   # Notify on failure
   notify-failure:
     name: Notify on Failure
-    needs: [python-test, nextjs-build, python-functions-test, training-function-test, security-scan]
+    needs: [python-test, nextjs-build, python-functions-test, training-function-test, security-scan, secret-scan]
     if: failure()
     runs-on: ubuntu-latest
     steps:

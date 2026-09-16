@@ -644,7 +644,7 @@ def write_model_registry() -> None:
     # whatever is already committed instead of a blank dict, so training just
     # one kind (e.g. `--kind refiner`) can't clobber another kind's real,
     # previously-recorded stats with an "error: file not found" stub.
-    entry = {
+    entry: dict = {
         "generator": {"name": "ensemble-generator", "kind": "generator"},
         "scorer": {"name": "ensemble-scorer", "kind": "scorer"},
         "refiner": {"name": "prompt-refiner", "kind": "refiner"},
