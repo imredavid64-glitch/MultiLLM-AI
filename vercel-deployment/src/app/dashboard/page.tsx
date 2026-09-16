@@ -1,0 +1,209 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { Zap, BarChart2, Key, Brain, Shield, Clock } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import DashboardHeader from "@/components/layout/dashboard-header";
+
+const SUBSCRIPTION_TIERS = [
+  { id: "free", name: "Free", price: 0, queriesPerMonth: 100, rateLimit: 10 },
+  { id: "pro", name: "Pro", price: 29, queriesPerMonth: 10000, rateLimit: 100 },
+  { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
+];
+
+const quickActions = [
+  { label: "New Ensemble Query", href: "/", icon: Zap, color: "bg-purple-600 hover:bg-purple-700" },
+  { label: "Generate API Key", href: "/dashboard/api-keys", icon: Key, color: "bg-blue-600 hover:bg-blue-700" },
+  { label: "Train Custom Model", href: "/dashboard/training", icon: Brain, color: "bg-emerald-600 hover:bg-emerald-700" },
+  { label: "View Analytics", href: "/dashboard/analytics", icon: BarChart2, color: "bg-orange-600 hover:bg-orange-700" },
+];
+
+interface Totals {
+  totalQueries: number;
+  avgAccuracy: number;
+  totalCarbonSaved: number;
+  avgLatencyMs: number;
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+  const userId = user?.id || "";
+  const [totals, setTotals] = useState<Totals>({ totalQueries: 0, avgAccuracy: 0, totalCarbonSaved: 0, avgLatencyMs: 0 });
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/analytics?user_id=${encodeURIComponent(userId)}`);
+        const json = await res.json();
+        if (json.totals) setTotals(json.totals);
+      } catch {
+        // leave defaults
+      }
+    })();
+  }, [userId]);
+
+  const stats = [
+    { label: "Queries This Month", value: totals.totalQueries.toLocaleString(), icon: Zap, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Avg Latency", value: `${(totals.avgLatencyMs / 1000).toFixed(2)}s`, icon: Clock, color: "text-blue-600", bg: "bg-blue-100" },
+    { label: "CO₂ Saved", value: `${totals.totalCarbonSaved}g`, icon: Shield, color: "text-emerald-600", bg: "bg-emerald-100" },
+    { label: "Ensemble Accuracy", value: `${totals.avgAccuracy}%`, icon: BarChart2, color: "text-orange-600", bg: "bg-orange-100" },
+  ];
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-slate-50">
+        <DashboardHeader />
+
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Welcome Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 text-white">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div>
+                  <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.user_metadata?.name || user?.profile?.name || "Developer"}</h1>
+                  <p className="text-purple-100 text-lg">
+                    Your Multi-LLM ensemble is ready. What will you ask today?
+                  </p>
+                </div>
+                <Link
+                  href="/"
+                  className="bg-white text-purple-600 hover:bg-purple-50 px-6 py-3 rounded-xl font-semibold transition-colors flex items-center gap-2"
+                >
+                  <Zap className="w-5 h-5" />
+                  Run Ensemble Query
+                </Link>
+              </div>
+            </div>
+          </motion.section>
+
+          {/* Stats Grid */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mb-8"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {stats.map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+                  className="bg-white rounded-xl shadow-sm p-6 border border-slate-100"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`${stat.bg} p-3 rounded-xl`}>
+                      <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
+                  <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* Quick Actions */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mb-8"
+          >
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Quick Actions</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {quickActions.map((action, index) => (
+                <motion.a
+                  key={action.label}
+                  href={action.href}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-white rounded-xl shadow-sm p-6 border border-slate-100 hover:shadow-md transition-all flex items-center gap-4"
+                >
+                  <div className={`${action.color} p-3 rounded-xl text-white`}>
+                    <action.icon className="w-6 h-6" />
+                  </div>
+                  <span className="font-medium text-slate-900">{action.label}</span>
+                </motion.a>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* Subscription Tier */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Your Plan</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {SUBSCRIPTION_TIERS.map((tier) => (
+                <motion.div
+                  key={tier.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                  className={`relative rounded-2xl p-6 border-2 transition-all ${
+                    tier.id === user?.profile?.plan
+                      ? "border-purple-500 bg-purple-50 shadow-lg shadow-purple-100"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {tier.id === user?.profile?.plan && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                      Current Plan
+                    </div>
+                  )}
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-slate-900">{tier.name}</h3>
+                    <div className="flex items-center justify-center gap-1 mt-2">
+                      <span className="text-4xl font-bold text-slate-900">${tier.price}</span>
+                      <span className="text-slate-500 mt-4">/month</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-center gap-2 text-slate-600">
+                      <span className="w-5 h-5 text-purple-600">✓</span>
+                      {tier.queriesPerMonth === -1 ? "Unlimited queries/month" : `${tier.queriesPerMonth.toLocaleString()} queries/month`}
+                    </li>
+                    <li className="flex items-center gap-2 text-slate-600">
+                      <span className="w-5 h-5 text-purple-600">✓</span>
+                      {tier.rateLimit} requests/minute
+                    </li>
+                    <li className="flex items-center gap-2 text-slate-600">
+                      <span className="w-5 h-5 text-purple-600">✓</span>
+                      {3} models available
+                    </li>
+                  </ul>
+                  <Link
+                    href="/dashboard/billing"
+                    className={`block text-center w-full py-3 rounded-xl font-semibold transition-colors ${
+                      tier.id === user?.profile?.plan
+                        ? "bg-slate-200 text-slate-600 cursor-not-allowed pointer-events-none"
+                        : "bg-purple-600 text-white hover:bg-purple-700"
+                    }`}
+                  >
+                    {tier.id === user?.profile?.plan ? "Current Plan" : tier.price === 0 ? "Manage Plan" : "Upgrade"}
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+        </main>
+      </div>
+    </ProtectedRoute>
+  );
+}

@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "database": {
+    "collections": [
+      {
+        "name": "users",
+        "permissions": "read,write"
+      },
+      {
+        "name": "queries",
+        "permissions": "read,write"
+      },
+      {
+        "name": "api_keys",
+        "permissions": "read,write"
+      },
+      {
+        "name": "training_jobs",
+        "permissions": "read,write"
+      }
+    ]
+  },
+  "functions": [
+    {
+      "name": "multi_llm_enhanced",
+      "runtime": "python3.11",
+      "entrypoint": "multi_llm_enhanced.py"
+    },
+    {
+      "name": "sustainable_analytics",
+      "runtime": "python3.11",
+      "entrypoint": "sustainable_analytics.py"
+    }
+  ],
+  "storage": {
+    "buckets": [
+      "model_weights",
+      "usage_analytics"
+    ]
+  }
+}

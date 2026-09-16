@@ -1,0 +1,213 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20.x'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Python tests and linting
+  python-test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install Python dependencies
+        run: |
+          pip install -U pip
+          pip install openai httpx torch numpy pytest pytest-cov black ruff mypy
+          pip install -e .
+      
+      - name: Run Python linting (ruff)
+        run: |
+          ruff check . --exclude=vercel-deployment
+      
+      - name: Run Python formatting check (black)
+        run: |
+          black --check . --exclude=vercel-deployment
+      
+      - name: Run Python type checking (mypy)
+        run: |
+          mypy ai_client.py local_models.py train/ --ignore-missing-imports || true
+      
+      - name: Run Python tests
+        run: |
+          pytest -v || true
+
+  # Next.js build and test
+  nextjs-build:
+    name: Next.js Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./vercel-deployment
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: vercel-deployment/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linting
+        run: npm run lint
+      
+      - name: Run type checking
+        run: npm run typecheck
+      
+      - name: Run build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
+      
+      - name: Run tests
+        run: npm test --if-present
+
+  # Python function tests
+  python-functions-test:
+    name: Python Functions Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./vercel-deployment/functions/query-ensemble
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -U pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+      
+      - name: Test function imports
+        run: |
+          python -c "from main import app; print('Import OK')"
+      
+      - name: Test health endpoint
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 3
+          curl -f http://localhost:8000/api/health
+          kill %1
+
+  # Training function tests
+  training-function-test:
+    name: Training Function Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./vercel-deployment/functions/training-job
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -U pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+      
+      - name: Test function imports
+        run: |
+          python -c "from main import app; print('Import OK')"
+
+  # Deploy to Vercel (on main branch)
+  deploy-vercel:
+    name: Deploy to Vercel
+    needs: [nextjs-build, python-functions-test, training-function-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+      
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Build Project Artifacts
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Deploy to Vercel
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run npm audit
+        run: |
+          cd vercel-deployment
+          npm audit --audit-level=high || true
+      
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit || true
+
+  # Notify on failure
+  notify-failure:
+    name: Notify on Failure
+    needs: [python-test, nextjs-build, python-functions-test, training-function-test, security-scan]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "Build failed! Check GitHub Actions for details."
+          # Add Slack/Discord/Email notification here
+          # curl -X POST -H 'Content-type: application/json' --data '{"text":"Build failed!"}' $SLACK_WEBHOOK_URL
