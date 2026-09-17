@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 120
+exclude = ["vercel-deployment", "models", "train/data"]
+
+[tool.ruff.lint]
+# Conservative, ruff's own long-standing default selection: pyflakes (F) plus
+# the pycodestyle error subsets that catch real bugs (syntax/runtime issues),
+# not style/modernization opinions (import sorting, typing.List vs list,
+# blind-except, etc.) that this pre-existing codebase was never written to.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.black]
+line-length = 120

@@ -35,7 +35,6 @@ next-env.d.ts
 *.tsbuildinfo
 vercel-deployment/.next/
 vercel-deployment/node_modules/
-vercel-deployment/package-lock.json
 
 # Trained model artifacts (reproducible via python -m train.train)
 models/

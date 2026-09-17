@@ -5,6 +5,7 @@ forward-pass/training sanity check on TinyGPT (does the loss go down on a
 tiny batch), and the local_models.refine_prompt() integration, including its
 fallback behavior when no trained model is present.
 """
+
 from __future__ import annotations
 
 import sys

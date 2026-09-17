@@ -20,7 +20,6 @@ from ai_client import (
     source_support_score,
 )
 
-
 APP_TITLE = "Hydra Local AI"
 APP_SUBTITLE = "Parallel multi-provider bots, local source grounding, privacy controls."
 
@@ -298,13 +297,13 @@ def main() -> None:
     render_header(providers=providers, source_index=source_index)
 
     if not providers:
-        st.error(
-            "No providers available. Add keys in the project root "
-            "`ai_client.py` or set provider env vars."
-        )
+        st.error("No providers available. Add keys in the project root " "`ai_client.py` or set provider env vars.")
         st.stop()
 
-    st.markdown("<p class='small-note'>Ask anything. The app runs parallel bots, cross-checks responses, and shows source/quality diagnostics per turn.</p>", unsafe_allow_html=True)
+    st.markdown(
+        "<p class='small-note'>Ask anything. The app runs parallel bots, cross-checks responses, and shows source/quality diagnostics per turn.</p>",
+        unsafe_allow_html=True,
+    )
     render_message_history()
 
     prompt = st.chat_input("Ask a question...")

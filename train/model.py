@@ -8,6 +8,7 @@ Two artifacts are produced by this package:
   1. A causal language model (the offline "ensemble candidate" generator).
   2. A small regressor that scores answers for source support, bias, clarity.
 """
+
 from __future__ import annotations
 
 import json
@@ -200,9 +201,7 @@ class TinyGPT(nn.Module):
         self.n_head = n_head
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
         self.position_embedding = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.ModuleList(
-            [TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)]
-        )
+        self.blocks = nn.ModuleList([TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)])
         self.ln_f = LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)
         self.token_embedding.weight = self.lm_head.weight
@@ -311,9 +310,7 @@ class TinyScorer(nn.Module):
         self.n_head = n_head
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
         self.position_embedding = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.ModuleList(
-            [TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)]
-        )
+        self.blocks = nn.ModuleList([TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)])
         self.ln_f = LayerNorm(n_embd)
         self.head = nn.Sequential(
             nn.Linear(n_embd, 32),

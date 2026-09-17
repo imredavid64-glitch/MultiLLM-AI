@@ -12,6 +12,7 @@ against this project's own bottleneck.
 Kept as its own module (not folded into ai_client.py) so the ensemble file
 stays a thin caller: `optimize_context(...)` in, an `OptimizedContext` out.
 """
+
 from __future__ import annotations
 
 import copy

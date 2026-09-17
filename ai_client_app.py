@@ -8,9 +8,8 @@ from typing import Dict, List, Sequence
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-"""
-OPENAI API KEY used from OPENROUTER, and a GEMINI API KEY used from GOOGLE AI STUDIO
-"""
+
+# OPENAI API KEY used from OPENROUTER, and a GEMINI API KEY used from GOOGLE AI STUDIO
 from ai_client import (
     ALLOWED_SOURCE_EXTENSIONS,
     SOURCES_DIR,
@@ -62,7 +61,6 @@ class HydraDesktopApp(tk.Tk):
         bg = "#f2eadc"
         panel = "#fff6e6"
         ink = "#101827"
-        line = "#d6c9b4"
         accent = "#0f766e"
 
         self.configure(bg=bg)

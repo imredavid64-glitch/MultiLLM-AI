@@ -12,7 +12,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, Iterable, List, Protocol, Sequence, Set, Tuple
+from typing import Any, Dict, List, Protocol, Sequence, Set, Tuple
+
 """
 OPENAI API KEY used from OPENROUTER, and a GEMINI API KEY used from GOOGLE AI STUDIO
 """
@@ -42,6 +43,7 @@ if not logger.handlers:
 BASE_DIR = Path(__file__).resolve().parent
 HISTORY_FILE = BASE_DIR / "chat_history.json"
 SOURCES_DIR = BASE_DIR / "knowledge_sources"
+
 
 # Optional local env file (gitignored) holding provider keys.
 #   OPENAI_API_KEY / OPENAI_API_KEYS  (OpenRouter: sk-or-v1-...)
@@ -229,16 +231,14 @@ class ChatProvider(Protocol):
     name: str
     model: str
 
-    def size(self) -> int:
-        ...
+    def size(self) -> int: ...
 
     def chat(
         self,
         messages: Sequence[Dict[str, str]],
         temperature: float,
         gen_p: "GenerationConfig | None" = None,
-    ) -> str:
-        ...
+    ) -> str: ...
 
 
 @dataclass
@@ -501,11 +501,11 @@ class OpenAIProvider:
             except (RateLimitError, APITimeoutError, APIError) as exc:
                 last_error = exc
                 logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
             except Exception as exc:
                 last_error = exc
                 logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
         logger.error("%s call failed after %d retries: %s", self.name, MAX_RETRIES, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
@@ -596,7 +596,7 @@ class GeminiProvider:
                     # Quota or auth errors can vary by model; try next model quickly.
                     if "HTTP 429" in str(exc) or "HTTP 401" in str(exc) or "HTTP 403" in str(exc):
                         break
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
         logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
@@ -651,7 +651,7 @@ class MistralProvider:
             except Exception as exc:
                 last_error = exc
                 logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
         logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
@@ -678,10 +678,14 @@ def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> Lis
     except Exception as exc:
         logger.debug("Local model provider unavailable: %s", exc)
 
-    openai_keys = user_keys.get("openai") or user_keys.get("openrouter") or load_keys_from_env(
-        multi_env="OPENAI_API_KEYS",
-        single_env="OPENAI_API_KEY",
-        file_env="OPENAI_API_KEYS_FILE",
+    openai_keys = (
+        user_keys.get("openai")
+        or user_keys.get("openrouter")
+        or load_keys_from_env(
+            multi_env="OPENAI_API_KEYS",
+            single_env="OPENAI_API_KEY",
+            file_env="OPENAI_API_KEYS_FILE",
+        )
     )
     if openai_keys:
         base_url = infer_openai_base_url(openai_keys)
@@ -981,8 +985,7 @@ def generate_candidate(
     recent_history = list(history[-MAX_HISTORY_MESSAGES:])
     if privacy_redaction:
         recent_history = [
-            {"role": item["role"], "content": redact_sensitive(item["content"])}
-            for item in recent_history
+            {"role": item["role"], "content": redact_sensitive(item["content"])} for item in recent_history
         ]
 
     system_prompt = (
@@ -1081,9 +1084,7 @@ def build_ensemble_answer(
                 try:
                     from local_models import blend_score
 
-                    s_score, b_score, c_score = blend_score(
-                        text, sources, s_score, b_score, c_score
-                    )
+                    s_score, b_score, c_score = blend_score(text, sources, s_score, b_score, c_score)
                 except Exception:
                     pass
                 total = (0.50 * s_score) + (0.25 * b_score) + (0.25 * c_score)
@@ -1274,10 +1275,7 @@ def main() -> None:
             if runtime_flags["privacy_redaction"]:
                 redaction_hits = detect_sensitive_hits(user_input)
                 if redaction_hits:
-                    print(
-                        "Privacy warning: sensitive patterns detected in your prompt -> "
-                        + ", ".join(redaction_hits)
-                    )
+                    print("Privacy warning: sensitive patterns detected in your prompt -> " + ", ".join(redaction_hits))
                     print("The prompt will be redacted before it is sent to remote APIs.")
 
             refined_input = maybe_refine_prompt(user_input)

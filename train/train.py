@@ -11,6 +11,7 @@ Usage:
   python -m train.train --kind scorer
   python -m train.train --epochs 20 --batch-size 8
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,7 @@ import torch
 import torch.nn.functional as F
 
 from train.dataset import build_lm_corpus, build_scorer_examples
-from train.model import CharacterTokenizer, TinyGPT, TinyScorer, WordTokenizer
+from train.model import TinyGPT, TinyScorer, WordTokenizer
 from train.prompt_refiner_data import build_prompt_refiner_corpus
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -169,9 +170,7 @@ def _corpus_hash(corpus: list[str]) -> str:
     return digest.hexdigest()
 
 
-def chunk_ids(
-    ids: list[int], block_size: int, batch_size: int
-) -> tuple[torch.Tensor, torch.Tensor]:
+def chunk_ids(ids: list[int], block_size: int, batch_size: int) -> tuple[torch.Tensor, torch.Tensor]:
     """Pack token ids into overlapping (x, targets) blocks."""
     xs: list[list[int]] = []
     ys: list[list[int]] = []
@@ -478,7 +477,7 @@ def train_prompt_refiner(
         seed_ids = tokenizer.encode(seed_prompt)
         sample = torch.tensor([seed_ids], dtype=torch.long).to(device)
         out = model.generate(sample, max_new_tokens=30, temperature=0.3, top_k=20)
-        generated = tokenizer.decode(out[0].tolist()[len(seed_ids):])
+        generated = tokenizer.decode(out[0].tolist()[len(seed_ids) :])
         for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
             cut = generated.find(marker)
             if cut != -1:

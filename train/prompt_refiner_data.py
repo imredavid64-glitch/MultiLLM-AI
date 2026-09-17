@@ -7,6 +7,7 @@ reuses the same canonical questions/paraphrases already curated in
 dataset.py (DOMAIN_EXAMPLES / QUESTION_PARAPHRASES) as the "refined" targets,
 and synthesizes casual/rough variants of them as inputs.
 """
+
 from __future__ import annotations
 
 import json

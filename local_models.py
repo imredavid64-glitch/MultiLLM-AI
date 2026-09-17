@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from ai_client import ChatProvider, GenerationConfig
+from ai_client import GenerationConfig
 
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"

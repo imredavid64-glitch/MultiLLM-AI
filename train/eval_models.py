@@ -18,7 +18,7 @@ from typing import Any, Dict, List
 
 import torch
 
-from ai_client import SourceIndex, bias_score, clarity_score, format_sources_for_prompt, source_support_score
+from ai_client import SourceIndex, bias_score, clarity_score, source_support_score
 from local_models import LocalModels, model_score_answer
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -149,7 +149,6 @@ def run_e2e() -> dict:
     index.refresh()
     t0 = time.time()
     sources = index.retrieve("How does a multi-LLM ensemble improve answer quality?", top_k=3)
-    ctx = format_sources_for_prompt(sources)
     text = generate("How does a multi-LLM ensemble improve answer quality?")
     s, b, c = source_support_score(text, sources), bias_score(text), clarity_score(text)
     learned = model_score_answer(text)

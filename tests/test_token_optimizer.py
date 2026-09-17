@@ -1,5 +1,6 @@
 """Tests for token_optimizer.py -- the context-trimming layer applied before
 every provider call in ai_client.build_ensemble_answer."""
+
 from __future__ import annotations
 
 import sys
@@ -91,7 +92,9 @@ def test_optimize_history_truncates_long_messages():
 def test_optimize_context_combines_source_and_history_savings():
     sources = [FakeSourceChunk("S1", "word " * 300)]
     history = [{"role": "user", "content": "x" * 2000}] * 10
-    result = optimize_context(sources, history, max_chars_per_source=100, max_history_messages=4, max_chars_per_message=200)
+    result = optimize_context(
+        sources, history, max_chars_per_source=100, max_history_messages=4, max_chars_per_message=200
+    )
     assert len(result.sources) == 1
     assert len(result.history) == 4
     assert result.savings.saved_tokens > 0

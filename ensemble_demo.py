@@ -7,6 +7,7 @@ Usage:
   python3 ensemble_demo.py "Your question here"
   python3 ensemble_demo.py --sources --top-k 3 "How does an ensemble improve quality?"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,7 +23,6 @@ from ai_client import (
     format_sources_for_prompt,
     format_sources_for_user,
     generate_candidate,
-    redact_sensitive,
     source_support_score,
 )
 from local_models import LocalTransformerProvider
@@ -40,7 +40,7 @@ def run_ensemble(query: str, top_k: int, show_sources: bool) -> None:
     source_context = format_sources_for_prompt(sources)
 
     print(f"Question: {query}")
-    print(f"Local model: LocalTransformerProvider (TinyGPT, from scratch)")
+    print("Local model: LocalTransformerProvider (TinyGPT, from scratch)")
     print(f"Sources: {len(sources)} retrieved from knowledge_sources/")
     print("-" * 64)
 

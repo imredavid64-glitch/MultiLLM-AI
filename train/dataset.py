@@ -13,11 +13,10 @@ examples for the answer-quality scorer.
 """
 from __future__ import annotations
 
-import itertools
 import json
 import random
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 PERSONAS = [
     ("Factual Analyst", "Prioritize precise facts and explicit assumptions."),
@@ -570,7 +569,6 @@ def _build_knowledge_docs() -> List[str]:
         return []
 
     title_re = re.compile(r"^#\s+(.+)$", re.MULTILINE)
-    sections_re = re.compile(r"^##\s+(.+)$", re.MULTILINE)
     docs: List[str] = []
     for path in sorted(base.glob("*.md")):
         text = path.read_text(encoding="utf-8", errors="ignore")

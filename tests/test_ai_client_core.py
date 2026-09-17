@@ -4,6 +4,7 @@ build_ensemble_answer happy path against a fake in-process provider.
 
 No real network calls or API keys are used anywhere in this file.
 """
+
 from __future__ import annotations
 
 import sys
@@ -14,7 +15,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import ai_client
 from ai_client import (
     RoundRobinKeys,
     SourceChunk,
@@ -28,10 +28,10 @@ from ai_client import (
     tokenize,
 )
 
-
 # ---------------------------------------------------------------------------
 # source_support_score
 # ---------------------------------------------------------------------------
+
 
 def _make_source(source_id: str, text: str) -> SourceChunk:
     return SourceChunk(source_id=source_id, path=Path(f"{source_id}.md"), text=text, tokens=set(tokenize(text)))
@@ -74,6 +74,7 @@ def test_source_support_score_unsupported_sentence_scores_zero():
 # bias_score
 # ---------------------------------------------------------------------------
 
+
 def test_bias_score_empty_answer_is_zero():
     assert bias_score("") == 0.0
 
@@ -94,6 +95,7 @@ def test_bias_score_rewards_citations_up_to_a_cap():
 # ---------------------------------------------------------------------------
 # clarity_score
 # ---------------------------------------------------------------------------
+
 
 def test_clarity_score_very_short_answer_is_penalized():
     short = "Yes."
@@ -116,6 +118,7 @@ def test_clarity_score_structure_bonus_for_bullet_lists():
 # ---------------------------------------------------------------------------
 # redact_sensitive / detect_sensitive_hits
 # ---------------------------------------------------------------------------
+
 
 def test_redact_sensitive_masks_email():
     text = "Contact me at jane.doe@example.com for details."
@@ -150,6 +153,7 @@ def test_detect_sensitive_hits_empty_for_clean_text():
 # RoundRobinKeys
 # ---------------------------------------------------------------------------
 
+
 def test_round_robin_keys_rotates_in_order():
     rr = RoundRobinKeys(["a", "b", "c"])
     assert [rr.next() for _ in range(3)] == ["a", "b", "c"]
@@ -168,6 +172,7 @@ def test_round_robin_keys_size():
 # ---------------------------------------------------------------------------
 # load_keys_from_env
 # ---------------------------------------------------------------------------
+
 
 def test_load_keys_from_env_multi_and_single_are_merged_and_deduped(monkeypatch):
     monkeypatch.setenv("TEST_KEYS", "k1, k2, k1")
@@ -195,6 +200,7 @@ def test_load_keys_from_env_reads_from_file(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 # build_ensemble_answer happy path (fake in-process provider, no network)
 # ---------------------------------------------------------------------------
+
 
 class FakeProvider:
     """Minimal ChatProvider: returns a canned, well-formed answer instantly."""
