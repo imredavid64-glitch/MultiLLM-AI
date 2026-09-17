@@ -229,7 +229,7 @@ def test_build_ensemble_answer_happy_path_returns_answer_candidates_and_savings(
     providers = [FakeProvider("Fake-A"), FakeProvider("Fake-B")]
     sources = [_make_source("S1", "background information relevant to the well-supported answer")]
 
-    answer, candidates, token_savings = build_ensemble_answer(
+    answer, candidates, token_savings, confidence_score = build_ensemble_answer(
         providers=providers,
         history=[],
         user_input="What does the source say?",
@@ -243,6 +243,25 @@ def test_build_ensemble_answer_happy_path_returns_answer_candidates_and_savings(
     assert all(c.total_score >= 0.0 for c in candidates)
     assert "tokens_saved" in token_savings
     assert "tokens_saved_pct" in token_savings
+    assert confidence_score is None  # not requested
+
+
+def test_build_ensemble_answer_deep_review_returns_confidence_score():
+    providers = [FakeProvider("Fake-A", reply="90"), FakeProvider("Fake-B")]
+    sources = [_make_source("S1", "background information relevant to the well-supported answer")]
+
+    _, _, _, confidence_score = build_ensemble_answer(
+        providers=providers,
+        history=[],
+        user_input="What does the source say?",
+        sources=sources,
+        bot_count=2,
+        privacy_redaction=False,
+        deep_review=True,
+    )
+
+    assert confidence_score is not None
+    assert 0.0 <= confidence_score <= 1.0
 
 
 def test_build_ensemble_answer_raises_when_no_providers_configured():

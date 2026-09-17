@@ -186,6 +186,35 @@ ALTER TABLE public.platform_api_keys ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage own platform API keys" ON public.platform_api_keys
     FOR ALL USING (auth.uid() = user_id);
 
+-- Multi-tenant client project tracking: an agency user creates one row per
+-- end-client they serve, and queries can be tagged against a project so
+-- usage/quality can be reported per end-client later.
+CREATE TABLE IF NOT EXISTS public.client_projects (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_projects_user_id ON public.client_projects(user_id);
+
+ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own client projects" ON public.client_projects
+    FOR ALL USING (auth.uid() = user_id);
+
+DROP TRIGGER IF EXISTS update_client_projects_updated_at ON public.client_projects;
+CREATE TRIGGER update_client_projects_updated_at
+    BEFORE UPDATE ON public.client_projects
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Tag queries against a client project (nullable -- not every query needs
+-- to belong to one).
+ALTER TABLE public.queries ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES public.client_projects(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_queries_project_id ON public.queries(project_id);
+
 -- Storage buckets (run in Supabase Dashboard > Storage)
 -- INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 -- VALUES 

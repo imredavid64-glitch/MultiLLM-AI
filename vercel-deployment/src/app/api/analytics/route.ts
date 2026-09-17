@@ -11,10 +11,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const [rows, stats] = await Promise.all([
+  const projectId = req.nextUrl.searchParams.get("project_id");
+
+  const [allRows, stats] = await Promise.all([
     getQueries(userId, 500, 0),
     getQueryStats(userId),
   ]);
+  const rows = projectId ? allRows.filter((r) => r.project_id === projectId) : allRows;
 
   const byDay = new Map<string, { queries: number; accuracySum: number; carbonSaved: number }>();
   const byProvider = new Map<string, { count: number; accuracySum: number; latencySum: number; carbonSum: number }>();
@@ -72,16 +75,22 @@ export async function GET(req: NextRequest) {
     ? Number(((rows.reduce((a, r) => a + r.confidence_score, 0) / rows.length) * 100).toFixed(1))
     : 0;
 
+  // When a project filter is applied, totals must reflect that filtered set,
+  // not the account-wide stats() call -- so derive them from `rows` directly
+  // rather than trusting `stats`, which is always unfiltered.
+  const totalCarbonSaved = rows.reduce((a, r) => a + r.carbon_saved, 0);
+  const avgLatencyMs = rows.length ? rows.reduce((a, r) => a + r.latency_ms, 0) / rows.length : 0;
+
   return NextResponse.json({
     overview,
     modelPerformance,
     usageByProvider,
     hourlyData,
     totals: {
-      totalQueries: stats.totalQueries,
+      totalQueries: projectId ? rows.length : stats.totalQueries,
       avgAccuracy,
-      totalCarbonSaved: Number(stats.totalCarbonSaved.toFixed(1)),
-      avgLatencyMs: Number(stats.avgLatency.toFixed(0)),
+      totalCarbonSaved: Number(totalCarbonSaved.toFixed(1)),
+      avgLatencyMs: Number(avgLatencyMs.toFixed(0)),
     },
   });
 }

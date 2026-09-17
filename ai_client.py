@@ -1031,6 +1031,63 @@ def maybe_refine_prompt(user_input: str) -> str:
         return user_input
 
 
+def run_deep_review(
+    answer: str,
+    sources: Sequence[SourceChunk],
+    providers: Sequence[ChatProvider],
+    exclude_provider: "ChatProvider | None" = None,
+    privacy_redaction: bool = True,
+) -> float | None:
+    """Optional second-pass verification: ask one more provider to rate
+    confidence in the answer that already won synthesis.
+
+    Deliberately a single extra call, not another full ensemble round --
+    "Deep Review" cross-checks the answer, it doesn't re-run the pipeline.
+    Falls back to the same heuristic scores used elsewhere in this file when
+    the LLM doesn't return a clean number, and returns None (not 0.0) when no
+    provider is available at all, so callers can tell "unavailable" apart
+    from "scored zero".
+    """
+    if not providers:
+        return None
+
+    reviewer = next((p for p in providers if p is not exclude_provider), providers[0])
+
+    source_context = format_sources_for_prompt(sources)
+    safe_answer = redact_sensitive(answer) if privacy_redaction else answer
+    prompt = (
+        "You are a strict fact-checker. Rate your confidence, from 0 to 100, "
+        "that the ANSWER below is accurate, well-supported by the SOURCES, and "
+        "free of one-sided bias. Respond with ONLY the number, nothing else.\n\n"
+        f"SOURCES:\n{source_context}\n\n"
+        f"ANSWER:\n{safe_answer}\n\n"
+        "Confidence (0-100):"
+    )
+    messages = [
+        {"role": "system", "content": "Respond with a single integer 0-100 and nothing else."},
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        reply = reviewer.chat(
+            messages=messages,
+            temperature=0.0,
+            gen_p=GenerationConfig(temperature=0.0, max_tokens=10),
+        )
+        match = re.search(r"\d{1,3}", reply)
+        if match:
+            score = max(0, min(100, int(match.group())))
+            return round(score / 100, 3)
+    except Exception as exc:
+        logger.warning("Deep review call failed, falling back to heuristic confidence: %s", exc)
+
+    # Fallback: heuristic re-score of the final answer, no extra call needed.
+    return round(
+        0.50 * source_support_score(answer, sources) + 0.25 * bias_score(answer) + 0.25 * clarity_score(answer),
+        3,
+    )
+
+
 def build_ensemble_answer(
     providers: Sequence[ChatProvider],
     history: Sequence[Dict[str, str]],
@@ -1039,7 +1096,8 @@ def build_ensemble_answer(
     bot_count: int,
     privacy_redaction: bool,
     gen_p: "GenerationConfig" = GenerationConfig(),
-) -> Tuple[str, List[Candidate], Dict[str, float]]:
+    deep_review: bool = False,
+) -> Tuple[str, List[Candidate], Dict[str, float], "float | None"]:
     from token_optimizer import optimize_context
 
     # Trim once per query, reused by every parallel bot call below -- the
@@ -1151,7 +1209,19 @@ def build_ensemble_answer(
     if detect_sensitive_hits(final_answer):
         final_answer = redact_sensitive(final_answer)
 
-    return final_answer.strip(), successful, token_savings
+    final_answer = final_answer.strip()
+
+    confidence_score: float | None = None
+    if deep_review:
+        confidence_score = run_deep_review(
+            answer=final_answer,
+            sources=sources,
+            providers=providers,
+            exclude_provider=synthesis_provider,
+            privacy_redaction=privacy_redaction,
+        )
+
+    return final_answer, successful, token_savings, confidence_score
 
 
 def print_help() -> None:
@@ -1283,7 +1353,7 @@ def main() -> None:
                 print(f"(refined prompt: {refined_input})")
 
             retrieved_sources = source_index.retrieve(refined_input, top_k=TOP_K_SOURCES)
-            answer, candidates, token_savings = build_ensemble_answer(
+            answer, candidates, token_savings, confidence_score = build_ensemble_answer(
                 providers=providers,
                 history=chat_history,
                 user_input=refined_input,

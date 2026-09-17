@@ -7,6 +7,7 @@ type Query = Database['public']['Tables']['queries']['Row'];
 type TrainingJob = Database['public']['Tables']['training_jobs']['Row'];
 type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 type PlatformApiKey = Database['public']['Tables']['platform_api_keys']['Row'];
+type ClientProject = Database['public']['Tables']['client_projects']['Row'];
 
 export const supabaseServer = createServerSupabaseClient();
 
@@ -171,6 +172,64 @@ export async function touchPlatformApiKeyUsage(id: string, currentUsageCount: nu
     .from('platform_api_keys')
     .update({ usage_count: currentUsageCount + 1, last_used_at: new Date().toISOString() })
     .eq('id', id);
+}
+
+// Client project operations (multi-tenant: one row per end-client an agency
+// user serves; queries can be tagged against a project for per-client
+// reporting).
+export const CLIENT_PROJECT_LIMITS: Record<'free' | 'pro' | 'enterprise', number> = {
+  free: 5,
+  pro: 25,
+  enterprise: Infinity,
+};
+
+export async function createClientProject(userId: string, name: string): Promise<ClientProject | null> {
+  const { data, error } = await supabaseServer
+    .from('client_projects')
+    .insert({ user_id: userId, name })
+    .select()
+    .single();
+  if (error) return null;
+  return data;
+}
+
+export async function getClientProjects(userId: string): Promise<ClientProject[]> {
+  const { data, error } = await supabaseServer
+    .from('client_projects')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+  if (error) return [];
+  return data;
+}
+
+export async function getClientProject(id: string): Promise<ClientProject | null> {
+  const { data, error } = await supabaseServer
+    .from('client_projects')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) return null;
+  return data;
+}
+
+export async function countActiveClientProjects(userId: string): Promise<number> {
+  const { count, error } = await supabaseServer
+    .from('client_projects')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_active', true);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+export async function deleteClientProject(id: string): Promise<boolean> {
+  const { error } = await supabaseServer
+    .from('client_projects')
+    .update({ is_active: false })
+    .eq('id', id);
+  return !error;
 }
 
 // Query History operations

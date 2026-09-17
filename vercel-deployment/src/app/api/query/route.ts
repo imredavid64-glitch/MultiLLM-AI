@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { MultiLLM } from "@/lib/multi-llm";
-import { getProfile, decrementCredits, getApiKeys } from "@/lib/supabase/services";
+import { getProfile, decrementCredits, getApiKeys, getClientProject } from "@/lib/supabase/services";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 import { checkRateLimit, getClientIp, type Tier } from "@/lib/rateLimiter";
@@ -36,6 +36,11 @@ export const dynamic = "force-dynamic";
 const multiLLM = new MultiLLM();
 const PYTHON_ENSEMBLE_URL = process.env.PYTHON_ENSEMBLE_URL || "http://localhost:8000";
 
+// Deep Review (cross-check the final answer with one extra provider call for
+// an explicit confidence score) is a paid-tier feature -- gated here, not in
+// the UI alone, since the UI toggle is trivially bypassable.
+const DEEP_REVIEW_PLANS = new Set(["pro", "enterprise"]);
+
 async function callPythonEnsemble(prompt: string, options: any = {}, requestId?: string) {
   try {
     const response = await fetch(`${PYTHON_ENSEMBLE_URL}/api/query`, {
@@ -64,6 +69,8 @@ export async function POST(req: NextRequest) {
   const requestId = req.headers.get("x-request-id") || crypto.randomUUID();
   let prompt = "";
   let options = {};
+  let requestedProjectId = "";
+  let requestedDeepReview = false;
 
   // Programmatic access via a generated API key takes precedence over the
   // dashboard's own logged-in session. Neither is ever taken from the
@@ -75,6 +82,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     prompt = typeof body?.prompt === "string" ? body.prompt : "";
+    requestedProjectId = typeof body?.project_id === "string" ? body.project_id : "";
+    requestedDeepReview = body?.deep_review === true;
     options = {
       bot_count: body?.bot_count,
       top_k: body?.top_k,
@@ -88,9 +97,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
   }
 
+  // A project_id is only ever trusted once verified to belong to this
+  // user -- same "never trust a client-supplied id" rule as user_id itself.
+  let projectId: string | null = null;
+  if (requestedProjectId && userId) {
+    const project = await getClientProject(requestedProjectId);
+    if (project && project.user_id === userId && project.is_active) {
+      projectId = project.id;
+    }
+  }
+
   const profile = userId ? await getProfile(userId) : null;
 
   const tier: Tier = (apiKeyAuth?.tier as Tier) || (profile?.plan as Tier) || "free";
+  const deepReviewAllowed = requestedDeepReview && DEEP_REVIEW_PLANS.has(profile?.plan || "free");
   const identityKey = apiKeyAuth ? `key:${apiKeyAuth.keyId}` : userId ? `user:${userId}` : undefined;
   const rateLimit = checkRateLimit({ ip: getClientIp(req), identityKey, tier });
   if (!rateLimit.allowed) {
@@ -114,6 +134,9 @@ export async function POST(req: NextRequest) {
   const userProviderKeys = userId ? await loadUserProviderKeys(userId) : null;
   if (userProviderKeys) {
     options = { ...options, provider_keys: userProviderKeys };
+  }
+  if (deepReviewAllowed) {
+    options = { ...options, deep_review: true };
   }
 
   // Policy: when the Python ensemble is unreachable, fail loudly (503) rather
@@ -146,12 +169,15 @@ export async function POST(req: NextRequest) {
   const sources: any[] = pythonResult.sources || [];
   const tokenSavings: Record<string, number> | null = pythonResult.token_savings || null;
   const refinedPrompt: string | null = pythonResult.refined_prompt || null;
+  const deepReviewConfidence: number | null =
+    typeof pythonResult.confidence_score === "number" ? pythonResult.confidence_score : null;
 
   // Save query history if userId provided
   if (userId) {
     const supabase = createServerSupabaseClient();
     const queryRecord = {
       user_id: userId,
+      project_id: projectId,
       prompt,
       answer,
       top_provider: candidates[0]?.provider_name || "MultiLLM",
@@ -181,6 +207,8 @@ export async function POST(req: NextRequest) {
       token_savings: tokenSavings,
       refined_prompt: refinedPrompt,
       request_id: requestId,
+      project_id: projectId,
+      deep_review_confidence: deepReviewConfidence,
     },
     { headers: { "x-request-id": requestId } }
   );

@@ -50,13 +50,29 @@ export default function AnalyticsPage() {
   const userId = user?.id || "";
   const [data, setData] = useState<AnalyticsData>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/client-projects");
+        const json = await res.json();
+        setProjects(json.projects || []);
+      } catch {
+        setProjects([]);
+      }
+    })();
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/analytics");
+        const qs = selectedProjectId ? `?project_id=${encodeURIComponent(selectedProjectId)}` : "";
+        const res = await fetch(`/api/analytics${qs}`);
         const json = await res.json();
         setData({ ...EMPTY, ...json });
       } catch {
@@ -65,7 +81,7 @@ export default function AnalyticsPage() {
         setLoading(false);
       }
     })();
-  }, [userId]);
+  }, [userId, selectedProjectId]);
 
   const metrics = [
     { title: "Total Queries", value: data.totals.totalQueries.toLocaleString(), icon: Activity, color: "text-blue-600" },
@@ -86,10 +102,26 @@ export default function AnalyticsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-8"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8"
           >
-            <h1 className="text-3xl font-bold text-slate-900">Analytics Dashboard</h1>
-            <p className="text-slate-600 mt-1">Insights into your Multi-LLM usage and performance</p>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Analytics Dashboard</h1>
+              <p className="text-slate-600 mt-1">Insights into your Multi-LLM usage and performance</p>
+            </div>
+            {projects.length > 0 && (
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium"
+              >
+                <option value="">All client projects</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </motion.div>
 
           <motion.div

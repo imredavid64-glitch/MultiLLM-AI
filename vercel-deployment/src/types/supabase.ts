@@ -80,6 +80,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          project_id: string | null;
           prompt: string;
           answer: string;
           top_provider: string;
@@ -95,6 +96,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          project_id?: string | null;
           prompt: string;
           answer: string;
           top_provider: string;
@@ -110,6 +112,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          project_id?: string | null;
           prompt?: string;
           answer?: string;
           top_provider?: string;
@@ -121,6 +124,32 @@ export interface Database {
           candidates?: Json | null;
           sources?: Json | null;
           created_at?: string;
+        };
+      };
+      client_projects: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
         };
       };
       training_jobs: {

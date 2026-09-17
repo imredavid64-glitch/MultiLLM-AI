@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/projects", label: "Client Projects" },
   { href: "/dashboard/api-keys", label: "API Keys" },
   { href: "/dashboard/analytics", label: "Analytics" },
   { href: "/dashboard/training", label: "Training" },

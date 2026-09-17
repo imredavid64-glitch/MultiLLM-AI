@@ -253,7 +253,7 @@ def run_turn(user_prompt: str) -> Dict:
         raise RuntimeError("No providers loaded. Add keys in ai_client.py or via env.")
 
     sources: List[SourceChunk] = st.session_state.source_index.retrieve(user_prompt)
-    answer, candidates, token_savings = build_ensemble_answer(
+    answer, candidates, token_savings, confidence_score = build_ensemble_answer(
         providers=providers,
         history=st.session_state.chat_history,
         user_input=user_prompt,

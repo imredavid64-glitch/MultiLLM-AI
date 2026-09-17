@@ -131,6 +131,8 @@ class QueryRequest(BaseModel):
     # Caller's own decrypted provider keys (BYO), grouped by provider name.
     # Only ever logged by key, never by value -- see build_provider_stack().
     provider_keys: Optional[Dict[str, List[str]]] = None
+    # Tier-gated on the Next.js side before this is ever set to true.
+    deep_review: Optional[bool] = False
 
 class CandidateResponse(BaseModel):
     bot_name: str
@@ -151,6 +153,7 @@ class QueryResponse(BaseModel):
     refined_prompt: Optional[str] = None
     token_savings: Optional[Dict[str, float]] = None
     request_id: Optional[str] = None
+    confidence_score: Optional[float] = None
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_ensemble(request: QueryRequest, http_request: Request):
@@ -177,13 +180,14 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
         start = time.perf_counter()
         refined_prompt = maybe_refine_prompt(request.prompt)
         sources = source_index.retrieve(refined_prompt, top_k=request.top_k or 6)
-        answer, candidates, token_savings = build_ensemble_answer(
+        answer, candidates, token_savings, confidence_score = build_ensemble_answer(
             providers=request_providers,
             history=[],
             user_input=refined_prompt,
             sources=sources,
             bot_count=bot_count,
             privacy_redaction=privacy_redaction,
+            deep_review=bool(request.deep_review),
         )
         latency_ms = (time.perf_counter() - start) * 1000
 
@@ -228,6 +232,7 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
             providers_used=providers_used,
             refined_prompt=refined_prompt if refined_prompt != request.prompt else None,
             token_savings=token_savings,
+            confidence_score=confidence_score,
             request_id=request_id,
         )
     except Exception as e:
