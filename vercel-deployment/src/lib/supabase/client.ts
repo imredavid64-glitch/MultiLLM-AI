@@ -3,6 +3,11 @@ import type { Database } from '@/types/supabase';
 
 // Check if we're in build time (no env vars)
 const isBuildTime = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// The server (service-role) client additionally needs its own secret key --
+// missing it is just as fatal as missing the public vars (constructing a
+// Supabase client with an undefined key throws immediately), so build/boot
+// with it unset must fall back to the same mock rather than crash.
+const isServerBuildTime = isBuildTime || !process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let _supabase: ReturnType<typeof createClient<Database>> | null = null;
 let _supabaseServer: SupabaseClient<any, "public", any> | null = null;
@@ -32,7 +37,7 @@ export const getSupabase = () => {
 };
 
 export const getSupabaseServer = () => {
-  if (isBuildTime) {
+  if (isServerBuildTime) {
     return getSupabase();
   }
   

@@ -1,6 +1,9 @@
 [tool.ruff]
 line-length = 120
-exclude = ["vercel-deployment", "models", "train/data"]
+# Directory patterns only (not substrings) -- "models" here must not match
+# local_models.py/eval_models.py, and neither dir has .py files anyway
+# (models/ is gitignored; train/data/ holds only generated .json corpora).
+exclude = ["vercel-deployment/", "/models/", "/train/data/"]
 
 [tool.ruff.lint]
 # Conservative, ruff's own long-standing default selection: pyflakes (F) plus

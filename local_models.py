@@ -7,6 +7,7 @@ Adds two capabilities to the ai_client.py architecture:
   2. model_score_answer        — replaces the heuristic scoring functions with
      the trained TinyScorer. It returns (source_support, bias, clarity).
 """
+
 from __future__ import annotations
 
 import json
@@ -140,7 +141,7 @@ def _build_local_prompt(messages: Sequence[Dict[str, str]]) -> str:
         if role == "system":
             body = content
             if body.startswith(SYSTEM_PROMPT_BASE.strip()):
-                body = body[len(SYSTEM_PROMPT_BASE.strip()):].strip()
+                body = body[len(SYSTEM_PROMPT_BASE.strip()) :].strip()
             persona_lines.append(body)
         elif role == "user":
             task_lines.append(content)
@@ -153,7 +154,9 @@ def _build_local_prompt(messages: Sequence[Dict[str, str]]) -> str:
     else:
         user_block = f"User request:\n{task}"
 
-    prompt = f"<|user|>\n{user_block}\n<|assistant|>\n{persona}\nKeep final answer practical and concise.\nBot answer:\n"
+    prompt = (
+        f"<|user|>\n{user_block}\n<|assistant|>\n{persona}\nKeep final answer practical and concise.\nBot answer:\n"
+    )
     return prompt
 
 
@@ -202,7 +205,7 @@ class LocalTransformerProvider:
         max_tokens = gen_p.max_tokens if gen_p is not None and gen_p.max_tokens else self.max_tokens
         with torch.no_grad():
             out = model.generate(seed, max_new_tokens=max_tokens, temperature=temp, top_k=40, repetition_penalty=1.3)
-        text = tokenizer.decode(out[0].tolist()[len(seed_ids):])
+        text = tokenizer.decode(out[0].tolist()[len(seed_ids) :])
         # Trim trailing special tokens or repeated block markers.
         for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
             idx = text.find(marker)
@@ -239,7 +242,7 @@ def refine_prompt(raw_prompt: str, max_new_tokens: int = 40) -> str:
         seed = torch.tensor([seed_ids], dtype=torch.long, device=device)
         with torch.no_grad():
             out = model.generate(seed, max_new_tokens=max_new_tokens, temperature=0.3, top_k=20, repetition_penalty=1.2)
-        text = tokenizer.decode(out[0].tolist()[len(seed_ids):])
+        text = tokenizer.decode(out[0].tolist()[len(seed_ids) :])
         for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
             idx = text.find(marker)
             if idx != -1:

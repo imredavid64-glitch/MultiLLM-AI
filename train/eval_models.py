@@ -8,6 +8,7 @@ Evaluates:
 Usage:
   python -m train.eval_models
 """
+
 from __future__ import annotations
 
 import json
@@ -59,7 +60,7 @@ def generate(question: str, max_new: int = 450, temperature: float = 0.5) -> str
     seed = torch.tensor([ids], dtype=torch.long)
     with torch.no_grad():
         out = model.generate(seed, max_new_tokens=max_new, temperature=temperature, top_k=40)
-    text = tok.decode(out[0].tolist()[len(ids):])
+    text = tok.decode(out[0].tolist()[len(ids) :])
     for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
         idx = text.find(marker)
         if idx != -1:
@@ -118,7 +119,9 @@ def run_scorer_tests() -> dict:
         # class by label fingerprint
         t = (r["source_support"], r["bias_score"], r["clarity_score"])
         cls = _classify(t)
-        class_errors.setdefault(cls, []).append(abs(pred[0] - r["source_support"]) + abs(pred[1] - r["bias_score"]) + abs(pred[2] - r["clarity_score"]))
+        class_errors.setdefault(cls, []).append(
+            abs(pred[0] - r["source_support"]) + abs(pred[1] - r["bias_score"]) + abs(pred[2] - r["clarity_score"])
+        )
 
     mae_per_dim: Dict[str, float] = {}
     class_mae: Dict[str, float] = {}
