@@ -15,6 +15,7 @@ export default function Footer() {
             <div className="flex gap-4">
               <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+              <Link href="/dpa" className="hover:text-white transition-colors">DPA</Link>
             </div>
             <p>© {new Date().getFullYear()} MultiLLM. All rights reserved.</p>
             <p>Zero-carbon · Privacy-first · Multi-language</p>
