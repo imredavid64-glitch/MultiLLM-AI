@@ -151,6 +151,10 @@ export async function POST(req: NextRequest) {
       n_head,
       n_embd,
       cpu: true,
+      // Lets the training service write real completion status back to
+      // this exact row once the run finishes, instead of it staying
+      // "running" forever (see functions/training-job/main.py).
+      supabase_job_id: job.id,
     }),
   });
 

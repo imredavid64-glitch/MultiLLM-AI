@@ -60,9 +60,17 @@ export default function BillingPage() {
   };
 
   const handleUpgrade = async (tierId: "free" | "pro" | "enterprise") => {
-    if (tierId === "free" || !userId) return;
+    if (!userId) return;
     if (demoMode) {
       toast.error("Billing requires a real account (demo mode has no payment backend).");
+      return;
+    }
+    // There's no direct "downgrade to free" endpoint -- cancelling in the
+    // Stripe billing portal is what actually drops a subscriber back to
+    // free (the webhook handles the plan change from there), so route
+    // there instead of silently doing nothing.
+    if (tierId === "free") {
+      await handleManageBilling();
       return;
     }
     setActionPending(tierId);
