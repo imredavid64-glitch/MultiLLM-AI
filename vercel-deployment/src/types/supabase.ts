@@ -163,12 +163,14 @@ export interface Database {
           n_layer: number;
           n_head: number;
           n_embd: number;
+          learning_rate: number;
           logs: string | null;
           model_path: string | null;
           final_loss: number | null;
           started_at: string | null;
           completed_at: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -180,12 +182,14 @@ export interface Database {
           n_layer?: number;
           n_head?: number;
           n_embd?: number;
+          learning_rate?: number;
           logs?: string | null;
           model_path?: string | null;
           final_loss?: number | null;
           started_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
@@ -197,12 +201,14 @@ export interface Database {
           n_layer?: number;
           n_head?: number;
           n_embd?: number;
+          learning_rate?: number;
           logs?: string | null;
           model_path?: string | null;
           final_loss?: number | null;
           started_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
       };
       subscriptions: {

@@ -60,13 +60,20 @@ CREATE TABLE IF NOT EXISTS public.training_jobs (
     n_layer INTEGER NOT NULL DEFAULT 6,
     n_head INTEGER NOT NULL DEFAULT 4,
     n_embd INTEGER NOT NULL DEFAULT 128,
+    learning_rate DOUBLE PRECISION NOT NULL DEFAULT 0.003,
     logs TEXT,
     model_path TEXT,
     final_loss DOUBLE PRECISION,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Added after the initial release -- covers a fresh CREATE TABLE above (no-op
+-- there) and backfills a pre-existing table on an already-provisioned project.
+ALTER TABLE public.training_jobs ADD COLUMN IF NOT EXISTS learning_rate DOUBLE PRECISION NOT NULL DEFAULT 0.003;
+ALTER TABLE public.training_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 -- Subscriptions (Stripe)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
@@ -177,6 +184,11 @@ CREATE TRIGGER update_api_keys_updated_at
 DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON public.subscriptions;
 CREATE TRIGGER update_subscriptions_updated_at
     BEFORE UPDATE ON public.subscriptions
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_training_jobs_updated_at ON public.training_jobs;
+CREATE TRIGGER update_training_jobs_updated_at
+    BEFORE UPDATE ON public.training_jobs
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Platform-issued gateway API keys (for programmatic Authorization: Bearer

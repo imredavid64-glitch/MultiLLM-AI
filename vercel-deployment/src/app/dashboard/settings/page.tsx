@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Save, Upload, User, Shield, CreditCard, Bell, Globe, Languages, Camera, Check, X } from "lucide-react";
+import { Save, Upload, User, Shield, CreditCard, Bell, Globe, Languages, Camera, Check, X, AlertTriangle } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -17,15 +18,16 @@ const avatarOptions = [
 ];
 
 export default function SettingsPage() {
-  const { user, refreshUser, updateProfile } = useAuth();
+  const { user, refreshUser, updateProfile, logout } = useAuth();
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.user_metadata?.name || user?.profile?.name || "");
   const [selectedAvatar, setSelectedAvatar] = useState(user?.user_metadata?.name?.split(" ")[0] || user?.profile?.name?.split(" ")[0] || "Alex");
-  const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState("en");
   const [timezone, setTimezone] = useState("UTC-8");
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -75,7 +77,6 @@ export default function SettingsPage() {
 
   const handleCancel = () => {
     setDisplayName(user?.user_metadata?.name || user?.profile?.name || "");
-    setEmail(user?.email || "");
     setPhone("");
     setLanguage("en");
     setTimezone("UTC-8");
@@ -87,6 +88,25 @@ export default function SettingsPage() {
       billing: true,
     });
     setIsEditing(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirm("Are you sure? This permanently deletes your account and all your data -- queries, API keys, client projects, and billing history. This cannot be undone.")) {
+      return;
+    }
+    setDeletingAccount(true);
+    try {
+      const res = await fetch("/api/account", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete account");
+      }
+      await logout();
+      router.push("/");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete account");
+      setDeletingAccount(false);
+    }
   };
 
   return (
@@ -200,11 +220,11 @@ export default function SettingsPage() {
                   <input
                     id="email"
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={!isEditing}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                    value={user?.email || ""}
+                    disabled
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-500"
                   />
+                  <p className="text-xs text-slate-400 mt-1">Changing your account email isn&apos;t supported yet.</p>
                 </div>
 
                 <div>
@@ -254,6 +274,10 @@ export default function SettingsPage() {
                 <Globe className="w-5 h-5 text-purple-600" />
                 Preferences
               </h2>
+              <div className="mb-6 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>These preferences are not saved yet -- changes here won&apos;t persist after you leave the page.</span>
+              </div>
               <form className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -337,6 +361,10 @@ export default function SettingsPage() {
                 <Shield className="w-5 h-5 text-purple-600" />
                 Security
               </h2>
+              <div className="mb-6 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>Two-factor authentication isn&apos;t implemented yet -- this toggle doesn&apos;t enable it.</span>
+              </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between py-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -367,7 +395,7 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <div className="font-medium text-slate-900">Session Timeout</div>
-                      <div className="text-sm text-slate-500">Auto-logout after 30 minutes of inactivity</div>
+                      <div className="text-sm text-slate-500">Auto-logout after 15 minutes of inactivity</div>
                     </div>
                   </div>
                   <span className="text-sm text-purple-600 font-medium">15 min (recommended)</span>
@@ -375,14 +403,11 @@ export default function SettingsPage() {
 
                 <button
                   type="button"
-                  className="w-full py-3 px-4 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 mt-4"
-                  onClick={() => {
-                    if (confirm("Are you sure? This will log you out from all devices and delete your data.")) {
-                      toast.error("This action would be implemented with Appwrite account deletion");
-                    }
-                  }}
+                  disabled={deletingAccount}
+                  className="w-full py-3 px-4 bg-red-50 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed text-red-700 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 mt-4"
+                  onClick={handleDeleteAccount}
                 >
-                  Delete Account
+                  {deletingAccount ? "Deleting..." : "Delete Account"}
                 </button>
               </div>
             </motion.div>

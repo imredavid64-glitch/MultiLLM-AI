@@ -23,6 +23,7 @@
     "OPENAI_API_KEY": "@openai-api-key",
     "GEMINI_API_KEY": "@gemini-api-key",
     "MISTRAL_API_KEY": "@mistral-api-key",
+    "GROQ_API_KEY": "@groq-api-key",
     "PYTHON_ENSEMBLE_URL": "@python-ensemble-url",
     "PYTHON_TRAINING_URL": "@python-training-url",
     "INTERNAL_API_SECRET": "@internal-api-secret",

@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
   const tier: Tier = (apiKeyAuth?.tier as Tier) || (profile?.plan as Tier) || "free";
   const deepReviewAllowed = requestedDeepReview && DEEP_REVIEW_PLANS.has(profile?.plan || "free");
   const identityKey = apiKeyAuth ? `key:${apiKeyAuth.keyId}` : userId ? `user:${userId}` : undefined;
-  const rateLimit = checkRateLimit({ ip: getClientIp(req), identityKey, tier });
+  const rateLimit = await checkRateLimit({ ip: getClientIp(req), identityKey, tier });
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please slow down." },

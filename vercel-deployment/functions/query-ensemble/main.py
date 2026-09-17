@@ -1,4 +1,5 @@
 """Vercel Python Function: Multi-LLM Ensemble Query Endpoint"""
+
 from __future__ import annotations
 
 import logging
@@ -21,8 +22,6 @@ from ai_client import (
     SourceIndex,
     build_ensemble_answer,
     maybe_refine_prompt,
-    GenerationConfig,
-    format_sources_for_user,
     format_provider_status,
     SOURCES_DIR,
     MAX_PARALLEL_BOTS,
@@ -71,10 +70,21 @@ async def require_internal_secret(request: Request, call_next):
 # Defense-in-depth backstop: the Next.js layer already enforces tier-aware
 # per-user limits before it ever calls this function, so this only needs a
 # coarse per-caller cap in case that layer is bypassed or misbehaves (e.g. a
-# retry storm). In-memory, per-process -- not distributed.
+# retry storm).
+#
+# Backed by Upstash Redis (REST API) when UPSTASH_REDIS_REST_URL/TOKEN are
+# set -- shared across every serverless instance -- and by an in-memory,
+# per-process dict otherwise. Mirrors vercel-deployment/src/lib/rateLimiter.ts
+# on the Next.js side; keep both in sync. Redis being unreachable fails OPEN
+# (the request is allowed) rather than blocking every request on a
+# rate-limiter outage.
 _rate_buckets: Dict[str, Dict[str, float]] = {}
 _RATE_WINDOW_SECONDS = 60.0
 QUERY_RATE_LIMIT_PER_MINUTE = parse_int_env("QUERY_RATE_LIMIT_PER_MINUTE", default=1000, minimum=1, maximum=100000)
+
+UPSTASH_URL = os.environ.get("UPSTASH_REDIS_REST_URL", "").rstrip("/")
+UPSTASH_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+USE_REDIS_RATE_LIMIT = bool(UPSTASH_URL and UPSTASH_TOKEN)
 
 
 def _client_key(request: Request) -> str:
@@ -82,6 +92,39 @@ def _client_key(request: Request) -> str:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+async def _redis_rate_limit_exceeded(key: str) -> Optional[int]:
+    """Returns retry_after_seconds if the caller is over budget, else None.
+    Raises on a genuine Redis error so the caller can fail open."""
+    import httpx as _httpx
+
+    redis_key = f"ratelimit:query-ensemble:{key}"
+    async with _httpx.AsyncClient(timeout=5.0) as client:
+        headers = {"Authorization": f"Bearer {UPSTASH_TOKEN}"}
+        incr_resp = await client.get(f"{UPSTASH_URL}/INCR/{redis_key}", headers=headers)
+        incr_resp.raise_for_status()
+        count = incr_resp.json()["result"]
+        if count == 1:
+            await client.get(f"{UPSTASH_URL}/EXPIRE/{redis_key}/{int(_RATE_WINDOW_SECONDS)}", headers=headers)
+        if count > QUERY_RATE_LIMIT_PER_MINUTE:
+            ttl_resp = await client.get(f"{UPSTASH_URL}/TTL/{redis_key}", headers=headers)
+            ttl_resp.raise_for_status()
+            ttl = ttl_resp.json()["result"]
+            return ttl if ttl and ttl > 0 else int(_RATE_WINDOW_SECONDS)
+        return None
+
+
+def _memory_rate_limit_exceeded(key: str) -> Optional[int]:
+    now = time.time()
+    bucket = _rate_buckets.get(key)
+    if bucket is None or now >= bucket["reset_at"]:
+        _rate_buckets[key] = {"count": 1.0, "reset_at": now + _RATE_WINDOW_SECONDS}
+        return None
+    bucket["count"] += 1
+    if bucket["count"] > QUERY_RATE_LIMIT_PER_MINUTE:
+        return max(1, int(bucket["reset_at"] - now))
+    return None
 
 
 @app.middleware("http")
@@ -96,22 +139,24 @@ async def attach_request_id(request: Request, call_next):
 async def rate_limit(request: Request, call_next):
     if request.url.path == "/api/health":
         return await call_next(request)
-    import time as _time
 
-    now = _time.time()
     key = _client_key(request)
-    bucket = _rate_buckets.get(key)
-    if bucket is None or now >= bucket["reset_at"]:
-        _rate_buckets[key] = {"count": 1.0, "reset_at": now + _RATE_WINDOW_SECONDS}
+    retry_after: Optional[int] = None
+    if USE_REDIS_RATE_LIMIT:
+        try:
+            retry_after = await _redis_rate_limit_exceeded(key)
+        except Exception as exc:
+            logger.warning("Redis rate limiter unavailable, failing open: %s", exc)
+            retry_after = None
     else:
-        bucket["count"] += 1
-        if bucket["count"] > QUERY_RATE_LIMIT_PER_MINUTE:
-            retry_after = max(1, int(bucket["reset_at"] - now))
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded"},
-                headers={"Retry-After": str(retry_after)},
-            )
+        retry_after = _memory_rate_limit_exceeded(key)
+
+    if retry_after is not None:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded"},
+            headers={"Retry-After": str(retry_after)},
+        )
     return await call_next(request)
 
 
@@ -121,6 +166,7 @@ source_index.refresh()
 
 BOT_COUNT = parse_int_env("BOT_COUNT", default=4, minimum=2, maximum=MAX_PARALLEL_BOTS)
 PRIVACY_REDACTION = parse_bool_env("PRIVACY_REDACTION", True)
+
 
 class QueryRequest(BaseModel):
     prompt: str
@@ -134,6 +180,7 @@ class QueryRequest(BaseModel):
     # Tier-gated on the Next.js side before this is ever set to true.
     deep_review: Optional[bool] = False
 
+
 class CandidateResponse(BaseModel):
     bot_name: str
     provider_name: str
@@ -142,6 +189,7 @@ class CandidateResponse(BaseModel):
     clarity_score: float
     total_score: float
     text: str
+
 
 class QueryResponse(BaseModel):
     answer: str
@@ -154,6 +202,7 @@ class QueryResponse(BaseModel):
     token_savings: Optional[Dict[str, float]] = None
     request_id: Optional[str] = None
     confidence_score: Optional[float] = None
+
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_ensemble(request: QueryRequest, http_request: Request):
@@ -215,12 +264,11 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
                 )
                 for c in candidates
             ],
-            sources=[
-                {"source_id": s.source_id, "path": str(s.path), "text": s.text[:200]}
-                for s in sources
-            ],
+            sources=[{"source_id": s.source_id, "path": str(s.path), "text": s.text[:200]} for s in sources],
             metrics={
-                "source_support": round(sum(c.source_score for c in candidates) / len(candidates), 3) if candidates else 0,
+                "source_support": (
+                    round(sum(c.source_score for c in candidates) / len(candidates), 3) if candidates else 0
+                ),
                 "bias": round(sum(c.bias_score for c in candidates) / len(candidates), 3) if candidates else 0,
                 "clarity": round(sum(c.clarity_score for c in candidates) / len(candidates), 3) if candidates else 0,
                 "top_score": round(candidates[0].total_score, 3) if candidates else 0,
@@ -239,6 +287,7 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
         logger.error("request %s failed: %s", request_id, e)
         raise HTTPException(status_code=500, detail=f"{e} (request_id={request_id})")
 
+
 @app.get("/api/health")
 async def health():
     return {
@@ -247,6 +296,7 @@ async def health():
         "sources": len(source_index.loaded_files),
         "provider_status": format_provider_status(providers),
     }
+
 
 @app.post("/api/reload-sources")
 async def reload_sources():
