@@ -49,6 +49,7 @@ SOURCES_DIR = BASE_DIR / "knowledge_sources"
 #   OPENAI_API_KEY / OPENAI_API_KEYS  (OpenRouter: sk-or-v1-...)
 #   GEMINI_API_KEY / GEMINI_API_KEYS
 #   MISTRAL_API_KEY / MISTRAL_API_KEYS
+#   GROQ_API_KEY / GROQ_API_KEYS
 def load_env_file(path: Path | None = None) -> None:
     source = path or (BASE_DIR / ".env")
     if not source.exists():
@@ -74,12 +75,15 @@ DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_MISTRAL_MODEL = "mistral-small-latest"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Provider keys are loaded ONLY from environment variables or key files.
 # No keys are hardcoded here. Set at least one of the env vars below:
 #   OPENAI_API_KEYS / OPENAI_API_KEY / OPENAI_API_KEYS_FILE
 #   GEMINI_API_KEYS / GEMINI_API_KEY / GEMINI_API_KEYS_FILE
 #   MISTRAL_API_KEYS / MISTRAL_API_KEY / MISTRAL_API_KEYS_FILE
+#   GROQ_API_KEYS / GROQ_API_KEY / GROQ_API_KEYS_FILE
 
 MAX_RETRIES = 4
 MAX_HISTORY_MESSAGES = 12
@@ -456,7 +460,12 @@ class OpenAIProvider:
     def __init__(self, api_keys: Sequence[str], model: str, base_url: str = "") -> None:
         self.model = model
         self.base_url = base_url.strip()
-        self.name = "OpenRouter (OpenAI API)" if "openrouter.ai" in self.base_url else "OpenAI-compatible"
+        if "openrouter.ai" in self.base_url:
+            self.name = "OpenRouter (OpenAI API)"
+        elif "groq.com" in self.base_url:
+            self.name = "Groq (OpenAI API)"
+        else:
+            self.name = "OpenAI-compatible"
         self._clients: List[OpenAI] = []
         for key in api_keys:
             client = OpenAI(api_key=key, base_url=self.base_url) if self.base_url else OpenAI(api_key=key)
@@ -711,6 +720,15 @@ def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> Lis
     if mistral_keys:
         mistral_model = os.environ.get("MISTRAL_MODEL", DEFAULT_MISTRAL_MODEL).strip() or DEFAULT_MISTRAL_MODEL
         providers.append(MistralProvider(api_keys=mistral_keys, model=mistral_model))
+
+    groq_keys = user_keys.get("groq") or load_keys_from_env(
+        multi_env="GROQ_API_KEYS",
+        single_env="GROQ_API_KEY",
+        file_env="GROQ_API_KEYS_FILE",
+    )
+    if groq_keys:
+        groq_model = os.environ.get("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
+        providers.append(OpenAIProvider(api_keys=groq_keys, model=groq_model, base_url=GROQ_BASE_URL))
 
     return providers
 
@@ -1307,6 +1325,7 @@ def main() -> None:
         print("  export OPENAI_API_KEYS='k1,k2' or OPENAI_API_KEY='k1'")
         print("  export GEMINI_API_KEYS='k1,k2' or GEMINI_API_KEY='k1'")
         print("  export MISTRAL_API_KEYS='k1,k2' or MISTRAL_API_KEY='k1'")
+        print("  export GROQ_API_KEYS='k1,k2' or GROQ_API_KEY='k1'")
         return
 
     requested_bots = parse_int_env("BOT_COUNT", default=4, minimum=2, maximum=MAX_PARALLEL_BOTS)

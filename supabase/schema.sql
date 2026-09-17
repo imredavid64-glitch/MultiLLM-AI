@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users table (extends auth.users)
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     name TEXT,
@@ -18,7 +18,7 @@ CREATE TABLE public.profiles (
 );
 
 -- API Keys table (encrypted)
-CREATE TABLE public.api_keys (
+CREATE TABLE IF NOT EXISTS public.api_keys (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     provider TEXT NOT NULL CHECK (provider IN ('openai', 'gemini', 'mistral', 'openrouter')),
@@ -33,7 +33,7 @@ CREATE TABLE public.api_keys (
 );
 
 -- Query History
-CREATE TABLE public.queries (
+CREATE TABLE IF NOT EXISTS public.queries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     prompt TEXT NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE public.queries (
 );
 
 -- Training Jobs
-CREATE TABLE public.training_jobs (
+CREATE TABLE IF NOT EXISTS public.training_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
@@ -69,7 +69,7 @@ CREATE TABLE public.training_jobs (
 );
 
 -- Subscriptions (Stripe)
-CREATE TABLE public.subscriptions (
+CREATE TABLE IF NOT EXISTS public.subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     stripe_customer_id TEXT NOT NULL UNIQUE,
@@ -83,12 +83,12 @@ CREATE TABLE public.subscriptions (
 );
 
 -- Indexes
-CREATE INDEX idx_profiles_email ON public.profiles(email);
-CREATE INDEX idx_api_keys_user_id ON public.api_keys(user_id);
-CREATE INDEX idx_queries_user_created ON public.queries(user_id, created_at DESC);
-CREATE INDEX idx_training_jobs_user_status ON public.training_jobs(user_id, status);
-CREATE INDEX idx_subscriptions_stripe_customer ON public.subscriptions(stripe_customer_id);
-CREATE INDEX idx_subscriptions_user_id ON public.subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON public.api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_queries_user_created ON public.queries(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_training_jobs_user_status ON public.training_jobs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_customer ON public.subscriptions(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions(user_id);
 
 -- Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -99,26 +99,33 @@ ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 -- Profiles: users can read/update their own profile
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles
     FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = id);
 
 -- API Keys: users can CRUD their own keys
+DROP POLICY IF EXISTS "Users can manage own API keys" ON public.api_keys;
 CREATE POLICY "Users can manage own API keys" ON public.api_keys
     FOR ALL USING (auth.uid() = user_id);
 
 -- Queries: users can read/create their own queries
+DROP POLICY IF EXISTS "Users can view own queries" ON public.queries;
 CREATE POLICY "Users can view own queries" ON public.queries
     FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can create queries" ON public.queries;
 CREATE POLICY "Users can create queries" ON public.queries
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Training Jobs: users can read/create/update their own jobs
+DROP POLICY IF EXISTS "Users can manage own training jobs" ON public.training_jobs;
 CREATE POLICY "Users can manage own training jobs" ON public.training_jobs
     FOR ALL USING (auth.uid() = user_id);
 
 -- Subscriptions: users can read their own subscription
+DROP POLICY IF EXISTS "Users can view own subscription" ON public.subscriptions;
 CREATE POLICY "Users can view own subscription" ON public.subscriptions
     FOR SELECT USING (auth.uid() = user_id);
 
@@ -130,7 +137,16 @@ BEGIN
     VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'name', 'free', 100);
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+-- This is SECURITY DEFINER (needs elevated rights to insert into profiles on
+-- a new auth.users row) and only ever meant to run as the trigger below --
+-- not to be called directly. Revoke the default PUBLIC/anon/authenticated
+-- EXECUTE grant so it isn't exposed as a callable RPC
+-- (/rest/v1/rpc/handle_new_user); the trigger itself doesn't need this grant
+-- to fire since it runs as part of the INSERT, not via a role's own EXECUTE
+-- privilege.
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 
 -- Trigger for new user signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -145,17 +161,20 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_api_keys_updated_at ON public.api_keys;
 CREATE TRIGGER update_api_keys_updated_at
     BEFORE UPDATE ON public.api_keys
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON public.subscriptions;
 CREATE TRIGGER update_subscriptions_updated_at
     BEFORE UPDATE ON public.subscriptions
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
@@ -183,6 +202,7 @@ CREATE INDEX IF NOT EXISTS idx_platform_api_keys_key_hash ON public.platform_api
 
 ALTER TABLE public.platform_api_keys ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own platform API keys" ON public.platform_api_keys;
 CREATE POLICY "Users can manage own platform API keys" ON public.platform_api_keys
     FOR ALL USING (auth.uid() = user_id);
 
@@ -202,6 +222,7 @@ CREATE INDEX IF NOT EXISTS idx_client_projects_user_id ON public.client_projects
 
 ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own client projects" ON public.client_projects;
 CREATE POLICY "Users can manage own client projects" ON public.client_projects
     FOR ALL USING (auth.uid() = user_id);
 
