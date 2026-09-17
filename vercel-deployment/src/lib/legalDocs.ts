@@ -13,5 +13,11 @@ import path from "path";
 // strip comment blocks here before the content ever reaches the renderer.
 export function readLegalDoc(filename: string): string {
   const raw = fs.readFileSync(path.join(process.cwd(), "legal", filename), "utf-8");
-  return raw.replace(/<!--[\s\S]*?-->/g, "").trim();
+  return raw
+    .replace(/<!--[\s\S]*?-->/g, "")
+    // The source keeps a "*Last updated: [DATE]*" line for editors, but the
+    // page shows today's date dynamically instead -- drop the static line
+    // so the two don't show two different, unsynced dates.
+    .replace(/\*Last updated:.*\*\s*$/, "")
+    .trim();
 }

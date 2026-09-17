@@ -20,7 +20,7 @@ MultiLLM is an API and dashboard that sends your prompts to one or more third-pa
 
 ## 4. Plans and billing
 
-- Current plans and prices are listed at [PRICING PAGE URL] (Base, Growth, Enterprise [CONFIRM: the app/database currently uses the internal plan names "free", "pro", "enterprise" -- decide whether "Base"/"Growth" are the intended public-facing marketing names for "free"/"pro" or whether this should just match the internal names exactly]). Prices may change with 30 days' notice for existing subscribers.
+- Current plans and prices are listed at [PRICING PAGE URL] (Base, Growth, Enterprise). Prices may change with 30 days' notice for existing subscribers.
 - Subscriptions renew automatically each billing period until cancelled. Cancelling stops future renewals; it does not refund the current period unless required by law.
 - Fees are billed in [CURRENCY] and are exclusive of applicable taxes (e.g., VAT), which are added where required.
 
@@ -42,7 +42,7 @@ MultiLLM routes your prompts to third-party model providers (currently OpenAI an
 
 ## 8. Service availability
 
-We aim for high availability but do not guarantee uninterrupted service. [If you commit to an SLA for Growth/Enterprise tiers, describe it here with specific uptime % and remedy.]
+We aim for high availability but do not guarantee uninterrupted service, and we do not commit to a specific uptime percentage or service-level remedy at this time.
 
 ## 9. Disclaimers and limitation of liability
 

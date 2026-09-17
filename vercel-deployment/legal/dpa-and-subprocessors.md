@@ -20,7 +20,7 @@ This Data Processing Agreement (DPA) describes how [COMPANY LEGAL NAME] ("Proces
 
 | Sub-processor | Purpose | Data location (typical) |
 | --- | --- | --- |
-| OpenAI and/or OpenRouter | AI model inference. [IMPORTANT: our "OpenAI" provider slot auto-detects an OpenRouter-format key (`sk-or-v1-...`) and routes through OpenRouter instead of OpenAI directly when configured that way -- confirm which one is actually configured in production and disclose both if it can vary, since OpenRouter is a separate company that itself forwards to an underlying model provider.] | United States |
+| OpenAI and/or OpenRouter | AI model inference. Our "OpenAI" provider slot can be configured with either a real OpenAI key or an OpenRouter key (OpenRouter is a separate company that itself forwards the request to an underlying model provider); both are disclosed here since either may be in use. | United States |
 | Google (Gemini) | AI model inference | United States / configurable region |
 | Mistral | AI model inference | European Union |
 | Groq | AI model inference (used for regular queries and for the optional Deep Review confidence check -- not exclusive to either) | United States |
