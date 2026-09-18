@@ -108,33 +108,33 @@ ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 -- Profiles: users can read/update their own profile
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles
-    FOR SELECT USING (auth.uid() = id);
+    FOR SELECT USING ((SELECT auth.uid()) = id);
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
-    FOR UPDATE USING (auth.uid() = id);
+    FOR UPDATE USING ((SELECT auth.uid()) = id);
 
 -- API Keys: users can CRUD their own keys
 DROP POLICY IF EXISTS "Users can manage own API keys" ON public.api_keys;
 CREATE POLICY "Users can manage own API keys" ON public.api_keys
-    FOR ALL USING (auth.uid() = user_id);
+    FOR ALL USING ((SELECT auth.uid()) = user_id);
 
 -- Queries: users can read/create their own queries
 DROP POLICY IF EXISTS "Users can view own queries" ON public.queries;
 CREATE POLICY "Users can view own queries" ON public.queries
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING ((SELECT auth.uid()) = user_id);
 DROP POLICY IF EXISTS "Users can create queries" ON public.queries;
 CREATE POLICY "Users can create queries" ON public.queries
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
 
 -- Training Jobs: users can read/create/update their own jobs
 DROP POLICY IF EXISTS "Users can manage own training jobs" ON public.training_jobs;
 CREATE POLICY "Users can manage own training jobs" ON public.training_jobs
-    FOR ALL USING (auth.uid() = user_id);
+    FOR ALL USING ((SELECT auth.uid()) = user_id);
 
 -- Subscriptions: users can read their own subscription
 DROP POLICY IF EXISTS "Users can view own subscription" ON public.subscriptions;
 CREATE POLICY "Users can view own subscription" ON public.subscriptions
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING ((SELECT auth.uid()) = user_id);
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -216,7 +216,7 @@ ALTER TABLE public.platform_api_keys ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can manage own platform API keys" ON public.platform_api_keys;
 CREATE POLICY "Users can manage own platform API keys" ON public.platform_api_keys
-    FOR ALL USING (auth.uid() = user_id);
+    FOR ALL USING ((SELECT auth.uid()) = user_id);
 
 -- Multi-tenant client project tracking: an agency user creates one row per
 -- end-client they serve, and queries can be tagged against a project so
@@ -236,7 +236,7 @@ ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can manage own client projects" ON public.client_projects;
 CREATE POLICY "Users can manage own client projects" ON public.client_projects
-    FOR ALL USING (auth.uid() = user_id);
+    FOR ALL USING ((SELECT auth.uid()) = user_id);
 
 DROP TRIGGER IF EXISTS update_client_projects_updated_at ON public.client_projects;
 CREATE TRIGGER update_client_projects_updated_at
