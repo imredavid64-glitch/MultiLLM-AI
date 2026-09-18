@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/projects", label: "Client Projects" },
   { href: "/dashboard/api-keys", label: "API Keys" },
   { href: "/dashboard/analytics", label: "Analytics" },
   { href: "/dashboard/training", label: "Training" },
@@ -62,9 +63,9 @@ export default function DashboardHeader() {
                 Demo
               </span>
             )}
-            <span className="text-sm text-slate-600 capitalize">{user?.prefs?.subscriptionTier || "Free"}</span>
+            <span className="text-sm text-slate-600 capitalize">{user?.profile?.plan || "Free"}</span>
             <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium">
-              {user?.name?.charAt(0).toUpperCase() || "U"}
+              {user?.user_metadata?.name?.charAt(0).toUpperCase() || "U"}
             </div>
             <button
               onClick={handleLogout}

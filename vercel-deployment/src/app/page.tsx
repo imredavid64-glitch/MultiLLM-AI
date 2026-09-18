@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { SustainabilityMetrics } from "@/types/multi-llm";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const quickPrompts = [
   "Explain quantum computing in simple terms",
@@ -14,23 +15,52 @@ const quickPrompts = [
 ];
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<null | { answer: string; metrics: SustainabilityMetrics }>(null);
+  const [result, setResult] = useState<
+    null | { answer: string; metrics: SustainabilityMetrics; deep_review_confidence?: number | null }
+  >(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [deepReview, setDeepReview] = useState(false);
+
+  const plan = user?.profile?.plan || "free";
+  const deepReviewAvailable = plan === "pro" || plan === "enterprise";
+
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!user?.id) {
+      setProjects([]);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch("/api/client-projects");
+        const json = await res.json();
+        setProjects(json.projects || []);
+      } catch {
+        setProjects([]);
+      }
+    })();
+  }, [user?.id]);
 
   const runQuery = async (text: string) => {
     if (!text.trim()) return;
     setQuery(text);
     setIsLoading(true);
     const toastId = toast.loading("Querying ensemble of LLMs...");
-    
+
     try {
       const res = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
+        body: JSON.stringify({
+          prompt: text,
+          project_id: selectedProjectId || undefined,
+          deep_review: deepReviewAvailable && deepReview,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
@@ -120,6 +150,49 @@ export default function HomePage() {
             </button>
           </form>
 
+          {projects.length > 0 && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <label htmlFor="project-select" className="text-sm text-slate-500">
+                Tag this query to:
+              </label>
+              <select
+                id="project-select"
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700"
+                disabled={isLoading}
+              >
+                <option value="">No client project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {user && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <label
+                className={`flex items-center gap-2 text-sm ${deepReviewAvailable ? "text-slate-600" : "text-slate-400"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={deepReviewAvailable && deepReview}
+                  onChange={(e) => setDeepReview(e.target.checked)}
+                  disabled={!deepReviewAvailable || isLoading}
+                />
+                Deep Review (cross-check with an extra model call for a confidence score)
+              </label>
+              {!deepReviewAvailable && (
+                <a href="/dashboard/billing" className="text-xs text-purple-600 underline">
+                  Upgrade to enable
+                </a>
+              )}
+            </div>
+          )}
+
           {/* Quick prompts */}
           <div className="mt-5">
             <p className="text-sm font-medium text-slate-500 mb-3">Try a quick prompt:</p>
@@ -188,6 +261,14 @@ export default function HomePage() {
                     </div>
                     <div className="text-xs text-slate-500">Emissions</div>
                   </div>
+                  {typeof result.deep_review_confidence === "number" && (
+                    <div>
+                      <div className="text-xl font-bold text-rose-600">
+                        {(result.deep_review_confidence * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-slate-500">Deep Review Confidence</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -200,7 +281,7 @@ export default function HomePage() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">Why MultiLLM?</h2>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            Single models hallucinate. Ensembles don't. We run your prompt across multiple providers and score every response.
+            Single models hallucinate. Ensembles don&apos;t. We run your prompt across multiple providers and score every response.
           </p>
         </div>
         

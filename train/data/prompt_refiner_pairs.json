@@ -1,0 +1,3126 @@
+[
+ {
+  "raw": "what types of questions work best with this ensemble or whatever",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "um so how are the candidate answers ranked",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "why is bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "like basically what happens when a reply leaks an identifier",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "so yeah what metrics does the system track for each query kind of",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "presenting both sides reduce misleading answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "not sure but what happens if every provider fails at once",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "what happens during the synthesis step if candidates are very different or something",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "quick q how do I tune how answers are ranked",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "kinda wondering how capable are the offline local models or something",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "um so why is bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "how are source paragraphs indexed and matched",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "do local sources give a chat assistant",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "how does the system prevent leaking sensitive information or something",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "the judge do after candidates are ranked",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "so yeah what cadence is recommended for retraining",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "hey quick question how are source paragraphs indexed and matched",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "like basically what happens if every provider fails at once basically",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "what happens when one API key runs out of quota",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "hey quick question how are unclear prompts answered i guess",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "ok so what types of questions work best with this ensemble",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "what happens if every provider fails at once",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "like basically what should I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "um so are PDF or Markdown files supported as sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "how are the bot personalities assigned if that makes sense",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "the bot personalities assigned",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "so yeah what occurs when no provider can answer a query kind of",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "not sure but how does a multi-LLM ensemble improve answer quality or whatever",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "rely on a single model provider",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "hey quick question what happens if every provider fails at once",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "not sure but how do I keep provider costs predictable i guess",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "ok so how do I keep provider costs predictable or whatever",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "how do I keep provider costs predictable",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "quick q what happens to answers that are too short kind of",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "what structure makes a response most readable",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "um so how does the platform track its carbon footprint or whatever",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "how are API keys protected in this platform or whatever",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "how does the judge handle wildly different answers or something",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "not sure but why do different bots use different instructions",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "does running locally reduce emissions if that makes sense",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "hey quick question what should I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "which document types can the index read",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "ok so how capable are the offline local models",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "um so can I customize the scoring weights for candidates",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "can the system answer without any local sources basically",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "like basically how are brief responses scored or something",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "what is the benefit of several API providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "what do the [S1], [S2] markers mean in answers i guess",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "what happens to answers that are too short you know",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "not sure but when is it time to retrain the models",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "how is chat history handled between turns basically",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "how does the ensemble choose which persona to use basically",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "quick q how are several provider keys managed",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "not sure but what happens if one provider fails during a query",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "I ask to get the most accurate answers",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "so yeah what metrics does the system track for each query or whatever",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "quick q how does the system prevent leaking sensitive information kind of",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "knowledge grounding useful for chat assistants",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "um so is it possible to index my own text files for answers you know",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "what does the judge do after candidates are ranked or whatever",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "which document types can the index read or whatever",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "so yeah what ranking decides which chunks are retrieved",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "how are the candidate answers ranked",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "how often should I retrain a custom model kind of",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "um so what happens when a question can be read multiple ways",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "several provider keys managed",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "what is the purpose of the persona system you know",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "quick q how does the system respond with no sources retrieved kind of",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "hey quick question what happens to answers that are too short kind of",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "kinda wondering what generation parameters control the bot output or something",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "quick q why do the bots use different personas or something",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "not sure but does grounding answers in local files help a chatbot or something",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "what prevents secrets from being sent to APIs you know",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "what are the limits of the tiny local models basically",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "what happens when a question can be read multiple ways basically",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "ok so can I customize the scoring weights for candidates",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "how are large files processed for retrieval i guess",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "what generation parameters control the bot output you know",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "how do I tune how answers are ranked",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "ok so how does the ensemble keep answers concise",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "not sure but what is privacy redaction in this system",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "what happens if one provider fails during a query if that makes sense",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "what occurs when a model call errors out",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "so yeah how do multiple API keys get used or whatever",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "quick q what file formats are supported as knowledge sources you know",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "hey quick question why do the bots use different personas",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "keys stored securely",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "what should I do if an answer contains sensitive data or something",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "ok so what is privacy redaction in this system or something",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "ok so can the system answer without any local sources you know",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "hey quick question how does the system prevent leaking sensitive information or whatever",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "the system prevent leaking sensitive information",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "ok so does running locally reduce emissions or whatever",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "what happens when one API key runs out of quota kind of",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "so yeah what happens to answers that are too short",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "how are unclear prompts answered",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "ok so what file formats are supported as knowledge sources you know",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "how is answer clarity measured you know",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "how are the top answers merged into one",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "hey quick question why is bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "kinda wondering does running locally reduce emissions",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "why do very short answers lose points on clarity i guess",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "how does the system respond with no sources retrieved",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "not sure but what does the judge do after candidates are ranked kind of",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "so yeah how does training from scratch differ from fine-tuning if that makes sense",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "how is a total provider outage handled",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "the small local generator not do well",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "which kinds of queries give the best results if that makes sense",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "which approach needs more data, training or fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "can the system answer without any local sources or whatever",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "hey quick question what happens to answers that are too short you know",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "not sure but what structure makes a response most readable if that makes sense",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "a multi-LLM ensemble improve answer quality",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "why not rely on a single model provider or whatever",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "when one API key runs out of quota",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "what makes a source chunk easy to retrieve",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "ok so why does the ensemble use multiple providers or whatever",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "can I customize the scoring weights for candidates you know",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "how do I load my own files as sources",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "when a reply leaks an identifier",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "how are contradictory model responses resolved basically",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "not sure but does running locally reduce emissions",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "like basically what is the difference between training and fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "kinda wondering how do multiple API keys get used or something",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "quick q how do citations work in generated answers if that makes sense",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "um so how are API keys protected in this platform basically",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "what if no two candidates agree on much",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "kinda wondering what makes a source chunk easy to retrieve if that makes sense",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "how are API keys protected in this platform or something",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "what are the limits of the tiny local models if that makes sense",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "hey quick question what should I do if an answer contains sensitive data i guess",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "what is the purpose of the persona system",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "how much conversation context is kept kind of",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "how are brief responses scored you know",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "not sure but what makes a source chunk easy to retrieve",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "how does the ensemble choose which persona to use or something",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "what ranking decides which chunks are retrieved i guess",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "which candidate answer wins",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "ok so what happens when no local files match the question",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "parameters control the bot output",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "so yeah how is chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "why do the bots use different personas or something",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "like basically how is chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "what are the limits of the tiny local models or whatever",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "not sure but what is the role of the synthesis step",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "kinda wondering how are long documents handled in knowledge_sources",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "what metrics does the system track for each query i guess",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "what benefit do local sources give a chat assistant kind of",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "the multiple personalities add to the ensemble",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "quick q how are the bot personalities assigned you know",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "what occurs when no provider can answer a query",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "how does the system prevent leaking sensitive information or whatever",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "not sure but what are the limits of the tiny local models",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "kinda wondering is the scoring formula adjustable kind of",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "how is conciseness rewarded in scoring",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "like basically what happens if one provider fails during a query",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "why is bias reduction important in AI answers you know",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "what types of questions work best with this ensemble",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "not sure but when is it time to retrain the models basically",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "quick q how does the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "brief responses scored",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "um so how does the system handle ambiguous questions",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "quick q what metrics does the system track for each query or something",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "answers in local files help a chatbot",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "hey quick question how are provider bills kept under control or whatever",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "so yeah can I add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "like basically which kinds of queries give the best results",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "um so what improves retrieval accuracy for a source file",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "very short answers lose points on clarity",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "hey quick question what makes an answer easy to understand you know",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "can I add my own documents to the system or whatever",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "should I retrain a custom model",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "how does the ensemble keep answers concise if that makes sense",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "so yeah how are source references marked in replies",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "an answer easy to understand",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "is local inference greener than cloud APIs",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "not sure but how do multiple API keys get used",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "does running locally reduce emissions",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "what is the role of the synthesis step if that makes sense",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "hey quick question how do I tune how answers are ranked or whatever",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "or Markdown files supported as sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "how are the candidate answers ranked basically",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "ok so why does the ensemble use multiple providers basically",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "quick q does running locally reduce emissions",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "ok so how does the judge handle wildly different answers i guess",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "like basically can I add my own documents to the system kind of",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "how are user credentials kept safe or whatever",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "to answers that are too short",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "like basically what prevents secrets from being sent to APIs",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "hey quick question how does presenting both sides reduce misleading answers or whatever",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "how are generated answers ordered by quality",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "no two candidates agree on much",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "hey quick question what is the purpose of the persona system or something",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "what happens when a reply leaks an identifier",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "kinda wondering how does the ensemble choose which persona to use or whatever",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "how capable are the offline local models you know",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "can I customize the scoring weights for candidates if that makes sense",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "kinda wondering can I customize the scoring weights for candidates",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "what is the purpose of the persona system i guess",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "different bots use different instructions",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "why does balanced framing matter in model responses kind of",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "how does the system handle ambiguous questions",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "what types of questions work best with this ensemble you know",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "what metrics does the system track for each query",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "ok so how are several provider keys managed basically",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "hey quick question how does the judge handle wildly different answers",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "what are the limits of the tiny local models",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "what happens during the synthesis step if candidates are very different you know",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "what happens when a question can be read multiple ways",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "source references marked in replies",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "the candidate answers ranked",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "how often should I retrain a custom model or whatever",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "what makes an answer easy to understand",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "is local inference greener than cloud APIs or whatever",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "what generation parameters control the bot output",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "ok so what happens if every provider fails at once or whatever",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "um so how does the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "it time to retrain the models",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "hey quick question why does the ensemble use multiple providers or something",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "so yeah what should I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "quick q what makes an answer easy to understand",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "citations work in generated answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "like basically is the scoring formula adjustable",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "what occurs when no provider can answer a query kind of",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "can the system answer without any local sources kind of",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "hey quick question how is each response evaluated",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "kinda wondering how are API keys protected in this platform i guess",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "each response evaluated",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "what file formats are supported as knowledge sources i guess",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "how are provider outages handled at runtime",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "large files processed for retrieval",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "not sure but what should I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "quick q does running locally reduce emissions basically",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "how are provider outages handled at runtime or whatever",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "so yeah how does temperature affect generated responses basically",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "kinda wondering why is bias reduction important in AI answers or something",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "what makes an answer easy to understand i guess",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "what metrics does the system track for each query or whatever",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "hey quick question how are source paragraphs selected for a question",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "like basically what happens when candidates disagree with each other kind of",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "hey quick question how does the system handle ambiguous questions",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "how does the platform track its carbon footprint if that makes sense",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "not sure but how are brief responses scored",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "user credentials kept safe",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "what if no two candidates agree on much basically",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "hey quick question how do citations work in generated answers basically",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "I keep provider costs predictable",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "why do different bots use different instructions basically",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "what do the multiple personalities add to the ensemble kind of",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "hey quick question why do very short answers lose points on clarity or whatever",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "kinda wondering why does balanced framing matter in model responses or something",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "um so how is chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "not sure but how are API keys protected in this platform",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "quick q how does retrieval decide which source chunks are relevant",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "so yeah does running locally reduce emissions",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "kinda wondering which scores are computed for every answer or something",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "what happens to answers that are too short or something",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "an ensemble of LLMs higher quality than a single model",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "what should I do if an answer contains sensitive data kind of",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "answer clarity measured",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "quick q what happens to a big document in the source index basically",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "not sure but can the system answer without any local sources kind of",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "how does presenting both sides reduce misleading answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "kinda wondering how is conciseness rewarded in scoring",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "not sure but how does the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "so yeah how are unclear prompts answered",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "the top answers merged into one",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "so yeah how does retrieval decide which source chunks are relevant",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "is it possible to index my own text files for answers you know",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "um so what types of questions work best with this ensemble if that makes sense",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "ok so what makes an answer easy to understand",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "can I customize the scoring weights for candidates",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "what happens if one provider fails during a query",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "hey quick question what should I ask to get the most accurate answers",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "not sure but why is bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "how are long documents handled in knowledge_sources if that makes sense",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "scoring formula adjustable",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "what is the role of the synthesis step",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "how capable are the offline local models",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "how are provider bills kept under control",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "the limits of the tiny local models",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "how does the ensemble keep answers concise kind of",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "the system hide sensitive data before calling APIs",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "quick q why do short and rambling answers score lower or whatever",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "not sure but how does retrieval decide which source chunks are relevant i guess",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "how are source references marked in replies",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "quick q how are source references marked in replies or whatever",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "so yeah how does presenting both sides reduce misleading answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "ok so what is the role of the synthesis step",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "like basically what makes an answer easy to understand or something",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "how does the system hide sensitive data before calling APIs if that makes sense",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "hey quick question what happens to answers that are too short basically",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "like basically how do multiple API keys get used",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "so yeah how are the top answers merged into one or something",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "kinda wondering how are the candidate answers ranked",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "training from scratch differ from fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "kinda wondering how is a total provider outage handled",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "locally reduce emissions",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "quick q how do I keep provider costs predictable",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "like basically what do the multiple personalities add to the ensemble if that makes sense",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "quick q is local knowledge grounding useful for chat assistants kind of",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "what keeps API costs stable per question",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "how does the ensemble choose which persona to use or whatever",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "when no local files match the question",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "the ensemble choose which persona to use",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "how does the system respond with no sources retrieved kind of",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "quick q how are long documents handled in knowledge_sources or something",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "balanced framing matter in model responses",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "makes a response most readable",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "how is chat history handled between turns if that makes sense",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "when candidates disagree with each other",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "um so what happens to old messages in a long chat",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "are the offline local models",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "why does the ensemble use multiple providers kind of",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "not sure but what should I do if an answer contains sensitive data you know",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "hey quick question how does the system hide sensitive data before calling APIs basically",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "short and rambling answers score lower",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "quick q is local inference greener than cloud APIs",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "like basically how are long documents handled in knowledge_sources you know",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "how does a multi-LLM ensemble improve answer quality if that makes sense",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "um so what file formats are supported as knowledge sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "kinda wondering are API keys stored securely i guess",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "ok so what generation parameters control the bot output",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "um so how is data protected before it reaches a provider",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "um so what occurs when a model call errors out",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "not sure but is local inference greener than cloud APIs i guess",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "what happens during the synthesis step if candidates are very different i guess",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "the bots use different personas",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "does the system track for each query",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "quick q does the platform use renewable energy kind of",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "what cadence is recommended for retraining",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "how does on-device processing affect carbon usage i guess",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "can I add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "the purpose of the persona system",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "how is each response evaluated if that makes sense",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "why do short and rambling answers score lower i guess",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "kinda wondering how often should I retrain a custom model or whatever",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "does the platform use renewable energy i guess",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "the ensemble use multiple providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "what is privacy redaction in this system",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "of queries give the best results",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "not sure but how are long documents handled in knowledge_sources basically",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "system answer without any local sources",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "is local knowledge grounding useful for chat assistants kind of",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "how do citations work in generated answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "kinda wondering how is data protected before it reaches a provider you know",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "can I add my own documents to the system i guess",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "like basically which document types can the index read i guess",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "what file formats are supported as knowledge sources if that makes sense",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "why not rely on a single model provider",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "hey quick question how does retrieval decide which source chunks are relevant i guess",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "um so what determines which candidate answer wins",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "um so how does a multi-LLM ensemble improve answer quality",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "what happens when a reply leaks an identifier i guess",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "hey quick question what determines which candidate answer wins if that makes sense",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "like basically how does on-device processing affect carbon usage",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "what types of questions work best with this ensemble if that makes sense",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "um so what happens when one API key runs out of quota",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "how are source paragraphs selected for a question",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "of questions work best with this ensemble",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "how is a total provider outage handled you know",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "like basically what generation parameters control the bot output you know",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "quick q can I add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "how does the judge handle wildly different answers",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "ok so does the platform use renewable energy basically",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "ok so why not rely on a single model provider",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "not sure but how does a multi-LLM ensemble improve answer quality i guess",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "are API keys stored securely",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "quick q what is the purpose of the persona system or whatever",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "so yeah how does the ensemble choose which persona to use",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "so yeah how are the bot personalities assigned",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "how are the candidate answers ranked i guess",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "kinda wondering how do I load my own files as sources i guess",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "kinda wondering how does retrieval decide which source chunks are relevant or something",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "how does a multi-LLM ensemble improve answer quality",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "so yeah how is answer clarity measured",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "not sure but how are generated answers ordered by quality i guess",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "how does the system handle ambiguous questions basically",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "kinda wondering what should I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "um so does running locally reduce emissions or whatever",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "what happens when no local files match the question or whatever",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "quick q which approach needs more data, training or fine-tuning or something",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "how does presenting both sides reduce misleading answers kind of",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "ok so how does the ensemble choose which persona to use if that makes sense",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "what do the [S1], [S2] markers mean in answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "during the synthesis step if candidates are very different",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "what is the benefit of several API providers if that makes sense",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "what do the multiple personalities add to the ensemble",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "in what way does combining multiple models make answers better",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "kinda wondering why is bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "can I customize the scoring weights for candidates or whatever",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "so yeah what happens when candidates disagree with each other",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "why is an ensemble of LLMs higher quality than a single model",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "hey quick question how does temperature affect generated responses",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "quick q how does on-device processing affect carbon usage or whatever",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "hey quick question how are API keys protected in this platform",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "how are source paragraphs indexed and matched you know",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "API keys protected in this platform",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "so yeah how often should I retrain a custom model",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "why is an ensemble of LLMs higher quality than a single model i guess",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "is local knowledge grounding useful for chat assistants or whatever",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "like basically how does a multi-LLM ensemble improve answer quality kind of",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "why does balanced framing matter in model responses",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "quick q how do citations work in generated answers basically",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "decides which chunks are retrieved",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "hey quick question how does the ensemble keep answers concise or whatever",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "kinda wondering how is private data removed from responses",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "hey quick question how are source paragraphs indexed and matched you know",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "what happens when no local files match the question",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "what makes an answer easy to understand or something",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "how does the system handle ambiguous questions if that makes sense",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "are API keys stored securely or whatever",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "kinda wondering what makes a source chunk easy to retrieve",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "so yeah why does the ensemble use multiple providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "can the system answer without any local sources",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "quick q how are contradictory model responses resolved",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "which sampling settings shape each answer or whatever",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "the difference between training and fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "how does a multi-LLM ensemble improve answer quality or whatever",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "kinda wondering how does the ensemble keep answers concise or something",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "what is privacy redaction in this system if that makes sense",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "so yeah why not rely on a single model provider or whatever",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "what happens to a big document in the source index",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "hey quick question which scores are computed for every answer",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "kinda wondering how are large files processed for retrieval or something",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "how is answer clarity measured",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "how does temperature affect generated responses",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "quick q what file formats are supported as knowledge sources or whatever",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "a source chunk easy to retrieve",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "like basically what can the small local generator not do well",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "the system respond with no sources retrieved",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "what benefit do local sources give a chat assistant",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "if every provider fails at once",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "so yeah what does the judge do after candidates are ranked",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "what happens to a big document in the source index or something",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "kinda wondering how does the system hide sensitive data before calling APIs",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "like basically how does the system handle ambiguous questions i guess",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "how are the bot personalities assigned",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "what ranking decides which chunks are retrieved",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "which approach needs more data, training or fine-tuning basically",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "how are generated answers ordered by quality basically",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "possible to index my own text files for answers",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "like basically how does the system respond with no sources retrieved",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "how does temperature affect generated responses you know",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "ok so in what way does combining multiple models make answers better",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "what happens if one provider fails during a query or something",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "ok so what happens if every provider fails at once you know",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "what should I ask to get the most accurate answers or something",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "how does the ensemble choose which persona to use if that makes sense",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "not sure but what types of questions work best with this ensemble",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "hey quick question why do very short answers lose points on clarity",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "the system handle ambiguous questions",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "is the service powered by green energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "hey quick question what is the purpose of the persona system",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "what cadence is recommended for retraining basically",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "not sure but is the service powered by green energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "like basically what is the difference between training and fine-tuning i guess",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "how is each response evaluated",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "is local knowledge grounding useful for chat assistants i guess",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "what can the small local generator not do well",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "data protected before it reaches a provider",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "so yeah what metrics does the system track for each query basically",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "provider bills kept under control",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "not sure but is local knowledge grounding useful for chat assistants",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "not sure but how is a total provider outage handled you know",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "um so what should I ask to get the most accurate answers i guess",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "when is it time to retrain the models if that makes sense",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "hey quick question what happens if one provider fails during a query you know",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "hey quick question how is conciseness rewarded in scoring i guess",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "how are user credentials kept safe",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "ok so how are the candidate answers ranked or whatever",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "what happens to answers that are too short",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "retrieval accuracy for a source file",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "so yeah does grounding answers in local files help a chatbot",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "ok so is local knowledge grounding useful for chat assistants or whatever",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "quick q what is the role of the synthesis step basically",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "what prevents secrets from being sent to APIs",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "um so what happens to answers that are too short kind of",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "not sure but what if no two candidates agree on much",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "ok so why do different bots use different instructions i guess",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "how does retrieval decide which source chunks are relevant",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "um so why is an ensemble of LLMs higher quality than a single model i guess",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "what is privacy redaction in this system you know",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "ok so how does the ensemble choose which persona to use or whatever",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "hey quick question does the platform use renewable energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "hey quick question how are user credentials kept safe or something",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "does the platform use renewable energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "the judge handle wildly different answers",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "how are brief responses scored",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "hey quick question what happens to old messages in a long chat or whatever",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "not sure but what do the multiple personalities add to the ensemble",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "why do short and rambling answers score lower",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "ok so how are the candidate answers ranked i guess",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "is the scoring formula adjustable or whatever",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "contradictory model responses resolved",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "like basically which kinds of queries give the best results or whatever",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "so yeah what happens when a question can be read multiple ways you know",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "so yeah what makes a source chunk easy to retrieve",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "hey quick question what is the difference between training and fine-tuning if that makes sense",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "um so how often should I retrain a custom model basically",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "ok so how are the candidate answers ranked",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "when a question can be read multiple ways",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "so yeah what metrics does the system track for each query if that makes sense",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "not sure but what makes a source chunk easy to retrieve if that makes sense",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "retrieval decide which source chunks are relevant",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "why do different bots use different instructions",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "which kinds of queries give the best results",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "does grounding answers in local files help a chatbot",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "how does the ensemble handle conflicting answers from different models i guess",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "quick q what file formats are supported as knowledge sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "ok so what makes an answer easy to understand i guess",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "settings shape each answer",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "not sure but what cadence is recommended for retraining if that makes sense",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "generated answers ordered by quality",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "does the platform use renewable energy basically",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "hey quick question how does the system handle ambiguous questions kind of",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "not sure but which sampling settings shape each answer",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "how does the system hide sensitive data before calling APIs",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "how do citations work in generated answers or something",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "what improves retrieval accuracy for a source file kind of",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "how is data protected before it reaches a provider",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "like basically which approach needs more data, training or fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "secrets from being sent to APIs",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "hey quick question does the platform use renewable energy i guess",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "quick q how are contradictory model responses resolved if that makes sense",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "what structure makes a response most readable basically",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "so yeah why do short and rambling answers score lower",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "not sure but how do I load my own files as sources",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "when is it time to retrain the models",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "what makes an answer easy to understand kind of",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "not sure but what happens if one provider fails during a query basically",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "quick q how are API keys protected in this platform",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "is the scoring formula adjustable",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "so yeah how does the system prevent leaking sensitive information you know",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "not sure but how is chat history handled between turns you know",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "um so what is the purpose of the persona system",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "how does on-device processing affect carbon usage",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "why do very short answers lose points on clarity",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "kinda wondering in what way does combining multiple models make answers better kind of",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "quick q how does the ensemble choose which persona to use if that makes sense",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "not sure but can the system answer without any local sources",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "how does the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "formats are supported as knowledge sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "ok so what types of questions work best with this ensemble or whatever",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "how are long documents handled in knowledge_sources",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "hey quick question how does the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "the [S1], [S2] markers mean in answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "what improves retrieval accuracy for a source file",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "the benefit of several API providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "source paragraphs indexed and matched",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "what happens if every provider fails at once or whatever",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "like basically how does the system prevent leaking sensitive information",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "does running locally reduce emissions basically",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "not sure but what happens to a big document in the source index",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "so yeah how is private data removed from responses i guess",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "quick q how does the system prevent leaking sensitive information i guess",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "how are provider bills kept under control or whatever",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "quick q what happens to answers that are too short you know",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "ok so how are API keys protected in this platform basically",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "like basically what can the small local generator not do well you know",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "like basically what do the [S1], [S2] markers mean in answers basically",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "when a model call errors out",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "not sure but how does the system handle ambiguous questions",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "a total provider outage handled",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "needs more data, training or fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "are computed for every answer",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "how are contradictory model responses resolved",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "um so how are source paragraphs selected for a question or something",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "not sure but what benefit do local sources give a chat assistant",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "um so how are the candidate answers ranked kind of",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "are PDF or Markdown files supported as sources kind of",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "so yeah is it possible to index my own text files for answers",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "to old messages in a long chat",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "customize the scoring weights for candidates",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "what happens when candidates disagree with each other you know",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "conversation context is kept",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "how does retrieval decide which source chunks are relevant or whatever",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "what happens to old messages in a long chat",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "not sure but what improves retrieval accuracy for a source file you know",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "hey quick question what do the [S1], [S2] markers mean in answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "service powered by green energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "how are source references marked in replies you know",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "ok so does the platform use renewable energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "why is bias reduction important in AI answers i guess",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "hey quick question what keeps API costs stable per question",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "so yeah how does the ensemble choose which persona to use i guess",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "what generation parameters control the bot output or whatever",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "kinda wondering how do I keep provider costs predictable you know",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "like basically what metrics does the system track for each query",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "how are the top answers merged into one you know",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "um so what happens to answers that are too short",
+  "refined": "What happens to answers that are too short?"
+ },
+ {
+  "raw": "kinda wondering can I add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "which scores are computed for every answer",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "not sure but how does a multi-LLM ensemble improve answer quality",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "ok so what makes a source chunk easy to retrieve",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "like basically how does the system handle ambiguous questions you know",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "the role of the synthesis step",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "how does the ensemble choose which persona to use",
+  "refined": "How does the ensemble choose which persona to use?"
+ },
+ {
+  "raw": "ok so how are provider bills kept under control",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "um so what are the limits of the tiny local models i guess",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "how do I load my own files as sources kind of",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "um so how does the system handle ambiguous questions if that makes sense",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "how is conciseness rewarded in scoring basically",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "not sure but what types of questions work best with this ensemble i guess",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "um so how do I keep provider costs predictable or something",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "how do I keep provider costs predictable or whatever",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "how does the system prevent leaking sensitive information",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "how is chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "hey quick question what happens when a reply leaks an identifier or whatever",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "quick q what happens if every provider fails at once",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "what happens to private information in prompts and replies you know",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "quick q what is the difference between training and fine-tuning or something",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "hey quick question how do citations work in generated answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "so yeah what happens if every provider fails at once",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "how does the system prevent leaking sensitive information you know",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "what determines which candidate answer wins or something",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "like basically does the platform use renewable energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "not sure but how are large files processed for retrieval",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "so yeah are API keys stored securely",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "how do I keep provider costs predictable basically",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "how does the ensemble handle conflicting answers from different models if that makes sense",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "if one provider fails during a query",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "ok so how often should I retrain a custom model",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "like basically which sampling settings shape each answer i guess",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "ok so why is bias reduction important in AI answers",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "ok so can I add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "what generation parameters control the bot output if that makes sense",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "hey quick question which document types can the index read",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "kinda wondering what is the role of the synthesis step or something",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "the ensemble keep answers concise",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "what happens during the synthesis step if candidates are very different if that makes sense",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "what happens when candidates disagree with each other",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "how do multiple API keys get used if that makes sense",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "quick q is local knowledge grounding useful for chat assistants you know",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "on-device processing affect carbon usage",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "are PDF or Markdown files supported as sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "ok so how does the ensemble handle conflicting answers from different models",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "how does training from scratch differ from fine-tuning you know",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "kinda wondering what occurs when no provider can answer a query",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "quick q what happens when no local files match the question or something",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "kinda wondering what keeps API costs stable per question if that makes sense",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "what metrics does the system track for each query if that makes sense",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "API costs stable per question",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "what determines which candidate answer wins",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "is the service powered by green energy kind of",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "um so how are long documents handled in knowledge_sources",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "not sure but how is each response evaluated i guess",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "kinda wondering why does the ensemble use multiple providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "source paragraphs selected for a question",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "not sure but how are the top answers merged into one",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "when no provider can answer a query",
+  "refined": "What happens if every provider fails at once?"
+ },
+ {
+  "raw": "um so how are generated answers ordered by quality",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "way does combining multiple models make answers better",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "is it possible to index my own text files for answers",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "um so how are provider outages handled at runtime i guess",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "so yeah what happens when one API key runs out of quota or something",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "privacy redaction in this system",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "um so why does the ensemble use multiple providers kind of",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "um so what is the benefit of several API providers kind of",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "quick q what happens during the synthesis step if candidates are very different",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "quick q what is the role of the synthesis step if that makes sense",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "which sampling settings shape each answer",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "hey quick question what if no two candidates agree on much basically",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "how does the platform track its carbon footprint",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "quick q why does balanced framing matter in model responses",
+  "refined": "Why is bias reduction important in AI answers?"
+ },
+ {
+  "raw": "how are large files processed for retrieval",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "to private information in prompts and replies",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "provider outages handled at runtime",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "how much conversation context is kept",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "can the system answer without any local sources or something",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "kinda wondering how does a multi-LLM ensemble improve answer quality basically",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "ok so how does a multi-LLM ensemble improve answer quality i guess",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "kinda wondering how are long documents handled in knowledge_sources you know",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "how is private data removed from responses",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "quick q what is the difference between training and fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "um so how does the ensemble handle conflicting answers from different models if that makes sense",
+  "refined": "How does the ensemble handle conflicting answers from different models?"
+ },
+ {
+  "raw": "so yeah is the service powered by green energy kind of",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "um so what ranking decides which chunks are retrieved or whatever",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "the platform track its carbon footprint",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "how do multiple API keys get used or something",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "how is data protected before it reaches a provider or whatever",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "so yeah what happens to private information in prompts and replies",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "is recommended for retraining",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "not sure but can I add my own documents to the system if that makes sense",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "what file formats are supported as knowledge sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "can I add my own documents to the system if that makes sense",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "can the system answer without any local sources if that makes sense",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "does grounding answers in local files help a chatbot you know",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "so yeah how do I keep provider costs predictable",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "ok so what occurs when a model call errors out basically",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "how does training from scratch differ from fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "I load my own files as sources",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "not sure but how is chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "how is private data removed from responses you know",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "ok so how much conversation context is kept",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "what does the judge do after candidates are ranked",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "how are several provider keys managed kind of",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "what keeps API costs stable per question you know",
+  "refined": "How do I keep provider costs predictable?"
+ },
+ {
+  "raw": "what occurs when a model call errors out or whatever",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "like basically what is privacy redaction in this system",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "hey quick question what types of questions work best with this ensemble kind of",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "hey quick question can the system answer without any local sources kind of",
+  "refined": "Can the system answer without any local sources?"
+ },
+ {
+  "raw": "not sure but is local knowledge grounding useful for chat assistants you know",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "how does the ensemble keep answers concise",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "like basically can I customize the scoring weights for candidates i guess",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "private data removed from responses",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "how are unclear prompts answered or whatever",
+  "refined": "How does the system handle ambiguous questions?"
+ },
+ {
+  "raw": "not sure but how does training from scratch differ from fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "platform use renewable energy",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "kinda wondering does running locally reduce emissions or whatever",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "um so what is privacy redaction in this system",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "like basically how is answer clarity measured i guess",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "which scores are computed for every answer if that makes sense",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "to a big document in the source index",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "is local knowledge grounding useful for chat assistants",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "why does the ensemble use multiple providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "kinda wondering what is the benefit of several API providers",
+  "refined": "Why does the ensemble use multiple providers?"
+ },
+ {
+  "raw": "why do the bots use different personas",
+  "refined": "What is the purpose of the persona system?"
+ },
+ {
+  "raw": "um so what happens to private information in prompts and replies basically",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "long documents handled in knowledge_sources",
+  "refined": "How are long documents handled in knowledge_sources?"
+ },
+ {
+  "raw": "um so what happens during the synthesis step if candidates are very different you know",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "so yeah how are provider outages handled at runtime",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "how are API keys protected in this platform",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "what is privacy redaction in this system or something",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "what happens to old messages in a long chat if that makes sense",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "what should I ask to get the most accurate answers",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "so yeah what happens if one provider fails during a query",
+  "refined": "What happens if one provider fails during a query?"
+ },
+ {
+  "raw": "not sure but how do citations work in generated answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "can I customize the scoring weights for candidates or something",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "what happens to private information in prompts and replies",
+  "refined": "What is privacy redaction in this system?"
+ },
+ {
+  "raw": "hey quick question can I add my own documents to the system",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "what makes a source chunk easy to retrieve basically",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "how do I tune how answers are ranked kind of",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "how often should I retrain a custom model",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "kinda wondering what metrics does the system track for each query",
+  "refined": "What metrics does the system track for each query?"
+ },
+ {
+  "raw": "quick q what benefit do local sources give a chat assistant if that makes sense",
+  "refined": "Is local knowledge grounding useful for chat assistants?"
+ },
+ {
+  "raw": "what should I do if an answer contains sensitive data",
+  "refined": "What should I do if an answer contains sensitive data?"
+ },
+ {
+  "raw": "can I add my own documents to the system you know",
+  "refined": "Can I add my own documents to the system?"
+ },
+ {
+  "raw": "what is the role of the synthesis step kind of",
+  "refined": "What is the role of the synthesis step?"
+ },
+ {
+  "raw": "hey quick question why is an ensemble of LLMs higher quality than a single model",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "how does a multi-LLM ensemble improve answer quality kind of",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "how do multiple API keys get used",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "what makes a source chunk easy to retrieve or something",
+  "refined": "What makes a source chunk easy to retrieve?"
+ },
+ {
+  "raw": "ok so how are user credentials kept safe",
+  "refined": "How are API keys protected in this platform?"
+ },
+ {
+  "raw": "what is the difference between training and fine-tuning",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "ok so what is the difference between training and fine-tuning or something",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "um so how much conversation context is kept or something",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "ok so what types of questions work best with this ensemble i guess",
+  "refined": "What types of questions work best with this ensemble?"
+ },
+ {
+  "raw": "um so how are the candidate answers ranked or whatever",
+  "refined": "How are the candidate answers ranked?"
+ },
+ {
+  "raw": "how are several provider keys managed",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "conciseness rewarded in scoring",
+  "refined": "How does the ensemble keep answers concise?"
+ },
+ {
+  "raw": "um so what makes an answer easy to understand",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "quick q what generation parameters control the bot output i guess",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "like basically what structure makes a response most readable",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "um so how does the platform track its carbon footprint",
+  "refined": "Does the platform use renewable energy?"
+ },
+ {
+  "raw": "types can the index read",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "in what way does combining multiple models make answers better you know",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "multiple API keys get used",
+  "refined": "How do multiple API keys get used?"
+ },
+ {
+  "raw": "what happens during the synthesis step if candidates are very different",
+  "refined": "What happens during the synthesis step if candidates are very different?"
+ },
+ {
+  "raw": "what is the difference between training and fine-tuning basically",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "what can the small local generator not do well you know",
+  "refined": "What are the limits of the tiny local models?"
+ },
+ {
+  "raw": "temperature affect generated responses",
+  "refined": "What generation parameters control the bot output?"
+ },
+ {
+  "raw": "like basically what file formats are supported as knowledge sources",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "quick q what is the difference between training and fine-tuning you know",
+  "refined": "What is the difference between training and fine-tuning?"
+ },
+ {
+  "raw": "how are source paragraphs selected for a question kind of",
+  "refined": "How does retrieval decide which source chunks are relevant?"
+ },
+ {
+  "raw": "like basically how do citations work in generated answers kind of",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "kinda wondering how is chat history handled between turns",
+  "refined": "How is chat history handled between turns?"
+ },
+ {
+  "raw": "how often should I retrain a custom model if that makes sense",
+  "refined": "How often should I retrain a custom model?"
+ },
+ {
+  "raw": "um so are PDF or Markdown files supported as sources kind of",
+  "refined": "What file formats are supported as knowledge sources?"
+ },
+ {
+  "raw": "I tune how answers are ranked",
+  "refined": "Can I customize the scoring weights for candidates?"
+ },
+ {
+  "raw": "inference greener than cloud APIs",
+  "refined": "Does running locally reduce emissions?"
+ },
+ {
+  "raw": "how does a multi-LLM ensemble improve answer quality basically",
+  "refined": "How does a multi-LLM ensemble improve answer quality?"
+ },
+ {
+  "raw": "um so how do citations work in generated answers",
+  "refined": "How do citations work in generated answers?"
+ },
+ {
+  "raw": "kinda wondering what prevents secrets from being sent to APIs basically",
+  "refined": "How does the system prevent leaking sensitive information?"
+ },
+ {
+  "raw": "kinda wondering what makes an answer easy to understand i guess",
+  "refined": "What makes an answer easy to understand?"
+ },
+ {
+  "raw": "unclear prompts answered",
+  "refined": "How does the system handle ambiguous questions?"
+ }
+]

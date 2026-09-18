@@ -1,94 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Key, Copy, Trash2, Eye, EyeOff, Shield, Clock, AlertCircle, CheckCircle } from "lucide-react";
+import { Key, Copy, Trash2, Shield, Clock, AlertCircle, CheckCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { toast } from "react-hot-toast";
 import DashboardHeader from "@/components/layout/dashboard-header";
 
-const mockApiKeys = [
-  {
-    id: "key_1",
-    name: "Production API",
-    prefix: "mllm_prod_",
-    key: "mllm_prod_abc123def456ghi789jkl012",
-    tier: "pro",
-    rateLimit: 100,
-    monthlyUsage: 2847,
-    lastUsed: new Date().toISOString(),
-    createdAt: "2026-07-01T00:00:00Z",
-  },
-  {
-    id: "key_2",
-    name: "Development",
-    prefix: "mllm_dev_",
-    key: "mllm_dev_xyz789uvw456rst123qwe456",
-    tier: "free",
-    rateLimit: 10,
-    monthlyUsage: 156,
-    lastUsed: new Date().toISOString(),
-    createdAt: "2026-07-10T00:00:00Z",
-  },
-];
+interface ApiKeySummary {
+  id: string;
+  name: string;
+  tier: "free" | "pro" | "enterprise";
+  key_prefix: string;
+  usage_count: number;
+  last_used_at: string | null;
+  created_at: string;
+}
 
 export default function ApiKeysPage() {
   const { user } = useAuth();
-  const [keys, setKeys] = useState(mockApiKeys);
+  const userId = user?.id || "";
+
+  const [keys, setKeys] = useState<ApiKeySummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
-  const [newKeyTier, setNewKeyTier] = useState<"free" | "pro" | "enterprise">(user?.prefs?.subscriptionTier as "free" | "pro" | "enterprise" || "free");
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [showKey, setShowKey] = useState<string | null>(null);
+  const [newKeyTier, setNewKeyTier] = useState<"free" | "pro" | "enterprise">(
+    (user?.profile?.plan as "free" | "pro" | "enterprise") || "free"
+  );
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const generateKey = (tier: string) => {
-    const prefix = tier === "enterprise" ? "mllm_ent_" : tier === "pro" ? "mllm_pro_" : "mllm_dev_";
-    const randomPart = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
-    return `${prefix}${randomPart}`;
+  const loadKeys = async () => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/api-keys");
+      const data = await res.json();
+      setKeys(data.keys || []);
+    } catch {
+      toast.error("Could not load API keys");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateKey = () => {
+  useEffect(() => {
+    loadKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const handleCreateKey = async () => {
     if (!newKeyName.trim()) {
       toast.error("Please enter a name for your API key");
       return;
     }
+    if (!userId) return;
 
-    const tierLimits = { free: 10, pro: 100, enterprise: 1000 };
-    const newKey = {
-      id: `key_${Date.now()}`,
-      name: newKeyName,
-      prefix: newKeyTier === "enterprise" ? "mllm_ent_" : newKeyTier === "pro" ? "mllm_pro_" : "mllm_dev_",
-      key: generateKey(newKeyTier),
-      tier: newKeyTier,
-      rateLimit: tierLimits[newKeyTier],
-      monthlyUsage: 0,
-      lastUsed: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newKeyName, tier: newKeyTier }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const created = await res.json();
 
-    setKeys([newKey, ...keys]);
-    setShowCreateModal(false);
-    setNewKeyName("");
-    setCopiedKey(newKey.key);
-    toast.success("API key created! Save it now - you won't see it again.");
+      setRevealedKey(created.key);
+      setShowCreateModal(false);
+      setNewKeyName("");
+      toast.success("API key created! Save it now - you won't see it again.");
+      await loadKeys();
+    } catch {
+      toast.error("Failed to create API key");
+    }
   };
 
   const copyToClipboard = async (key: string) => {
     try {
       await navigator.clipboard.writeText(key);
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 3000);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
       toast.success("Copied to clipboard!");
     } catch {
       toast.error("Could not copy to clipboard");
     }
   };
 
-  const deleteKey = (id: string) => {
-    if (confirm("Are you sure you want to delete this API key? This cannot be undone.")) {
-      setKeys(keys.filter((k) => k.id !== id));
+  const deleteKey = async (id: string) => {
+    if (!userId) return;
+    if (!confirm("Are you sure you want to delete this API key? This cannot be undone.")) return;
+
+    try {
+      const res = await fetch(`/api/api-keys/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Request failed");
+      setKeys((prev) => prev.filter((k) => k.id !== id));
       toast.success("API key deleted");
+    } catch {
+      toast.error("Failed to delete API key");
     }
   };
 
@@ -130,6 +142,38 @@ export default function ApiKeysPage() {
             </button>
           </motion.div>
 
+          {/* Newly created key banner (shown once) */}
+          {revealedKey && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8 p-6 bg-purple-50 border-2 border-purple-200 rounded-2xl"
+            >
+              <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-purple-600" />
+                Copy this key now - it won&apos;t be shown again
+              </h3>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-4 py-2 bg-white rounded-lg font-mono text-sm border border-slate-200 overflow-x-auto">
+                  {revealedKey}
+                </code>
+                <button
+                  onClick={() => copyToClipboard(revealedKey)}
+                  className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+                >
+                  {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  onClick={() => setRevealedKey(null)}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-lg transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {/* API Keys List */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -137,7 +181,9 @@ export default function ApiKeysPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"
           >
-            {keys.length === 0 ? (
+            {loading ? (
+              <div className="p-12 text-center text-slate-500">Loading...</div>
+            ) : keys.length === 0 ? (
               <div className="p-12 text-center">
                 <Key className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-slate-900 mb-2">No API keys yet</h3>
@@ -170,7 +216,7 @@ export default function ApiKeysPage() {
                           {getTierBadge(key.tier)}
                         </div>
                         <p className="text-sm text-slate-500 font-mono truncate max-w-xs">
-                          {showKey === key.key ? key.key : `${key.prefix}••••••••••••••••••••`}
+                          {key.key_prefix}••••••••••••••••••••
                         </p>
                       </div>
                     </div>
@@ -178,46 +224,15 @@ export default function ApiKeysPage() {
                     <div className="flex items-center gap-6 sm:gap-8 text-sm text-slate-500">
                       <div className="flex items-center gap-1">
                         <Shield className="w-4 h-4" />
-                        <span>{key.rateLimit}/min</span>
+                        <span>{key.usage_count.toLocaleString()} calls</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        <span>{key.monthlyUsage.toLocaleString()}/month</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>Created {formatDate(key.createdAt)}</span>
+                        <span>Created {formatDate(key.created_at)}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 sm:ml-auto">
-                      <button
-                        onClick={() => setShowKey(showKey === key.key ? null : key.key)}
-                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
-                        title="Show/Hide Key"
-                      >
-                        {showKey === key.key ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                      {showKey === key.key && (
-                        <div className="relative">
-                          <button
-                            onClick={() => copyToClipboard(key.key)}
-                            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
-                          >
-                            {copiedKey === key.key ? (
-                              <>
-                                <CheckCircle className="w-4 h-4" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-4 h-4" />
-                                Copy
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
                       <button
                         onClick={() => deleteKey(key.id)}
                         className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
@@ -241,30 +256,25 @@ export default function ApiKeysPage() {
           >
             <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5 text-purple-600" />
-              Rate Limits & Best Practices
+              Using Your Key
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
               <div className="bg-white p-4 rounded-xl">
-                <h4 className="font-medium text-slate-900 mb-2">Rate Limits</h4>
-                <ul className="space-y-1">
-                  <li>• Free: 10 requests/minute</li>
-                  <li>• Pro: 100 requests/minute</li>
-                  <li>• Enterprise: 1,000 requests/minute</li>
-                </ul>
-              </div>
-              <div className="bg-white p-4 rounded-xl">
-                <h4 className="font-medium text-slate-900 mb-2">Headers</h4>
+                <h4 className="font-medium text-slate-900 mb-2">Request</h4>
                 <pre className="text-xs bg-slate-100 p-3 rounded overflow-x-auto">
-{`Authorization: Bearer mllm_pro_xxx...
-Content-Type: application/json`}
+{`POST /api/query
+Authorization: Bearer mllm_pro_xxx...
+Content-Type: application/json
+
+{ "prompt": "..." }`}
                 </pre>
               </div>
               <div className="bg-white p-4 rounded-xl">
                 <h4 className="font-medium text-slate-900 mb-2">Security</h4>
                 <ul className="space-y-1">
-                  <li>• Keys shown only once</li>
-                  <li>• Rotate keys regularly</li>
-                  <li>• Use env variables in production</li>
+                  <li>• Keys are shown only once</li>
+                  <li>• Delete and re-create a key if it leaks</li>
+                  <li>• Use environment variables in production, never commit keys</li>
                 </ul>
               </div>
             </div>
@@ -317,7 +327,7 @@ Content-Type: application/json`}
                             ? "border-purple-500 bg-purple-50 text-purple-700"
                             : "border-slate-200 hover:border-slate-300 text-slate-600"
                         }`}
-                        disabled={user?.prefs?.subscriptionTier === "free" && tier !== "free"}
+                        disabled={user?.profile?.plan === "free" && tier !== "free"}
                       >
                         <div className="font-semibold capitalize">{tier}</div>
                         <div className="text-xs text-slate-500 mt-1">
@@ -326,7 +336,7 @@ Content-Type: application/json`}
                       </button>
                     ))}
                   </div>
-                  {user?.prefs?.subscriptionTier === "free" && newKeyTier !== "free" && (
+                  {user?.profile?.plan === "free" && newKeyTier !== "free" && (
                     <p className="text-xs text-red-500 mt-1">Upgrade to Pro to use Pro/Enterprise keys</p>
                   )}
                 </div>

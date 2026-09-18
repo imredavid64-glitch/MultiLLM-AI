@@ -1,61 +1,115 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, UserPrefs } from "@/lib/appwrite/types";
-import { account, ID } from "@/lib/appwrite/client";
+import { createBrowserClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
+
+interface Profile {
+  id: string;
+  email: string;
+  name: string | null;
+  plan: "free" | "pro" | "enterprise";
+  credits: number;
+  plan_expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: (User & { profile?: Profile }) | null;
   loading: boolean;
   demoMode: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  updateUser: (updates: Partial<User> & { prefs?: Partial<UserPrefs> }) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const DEMO_USER_KEY = "multillm_demo_user";
 
-function demoUser(email: string, name: string): User {
+function demoUser(email: string, name: string): User & { profile: Profile } {
   return {
-    $id: "demo-user",
-    $createdAt: new Date().toISOString(),
-    $updatedAt: new Date().toISOString(),
-    name,
+    id: "demo-user",
+    aud: "authenticated",
+    role: "authenticated",
     email,
-    prefs: {
-      subscriptionTier: "pro",
-      apiKeys: [],
-      models: ["ensemble-generator", "ensemble-scorer"],
-      monthlyQueries: 1342,
-      totalQueries: 8421,
-      totalCarbonSaved: 5.4,
-      createdAt: new Date().toISOString(),
+    email_confirmed_at: new Date().toISOString(),
+    phone: "",
+    confirmation_sent_at: new Date().toISOString(),
+    confirmed_at: new Date().toISOString(),
+    last_sign_in_at: new Date().toISOString(),
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { name },
+    identities: [{ identity_id: "demo-user", id: "demo-user", user_id: "demo-user", identity_data: { email }, provider: "email", last_sign_in_at: new Date().toISOString() }] as any,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    profile: {
+      id: "demo-user",
+      email,
+      name,
+      plan: "pro",
+      credits: 10000,
+      plan_expires_at: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
   };
 }
 
-function loadDemoUser(): User | null {
+function loadDemoUser(): (User & { profile: Profile }) | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(DEMO_USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
+    return raw ? (JSON.parse(raw) as User & { profile: Profile }) : null;
   } catch {
     return null;
   }
 }
 
 function isDemoMode(): boolean {
-  return !process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+}
+
+function getSupabase() {
+  if (typeof window === "undefined") {
+    // Return a mock client for SSR
+    return {
+      from: () => ({
+        select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+        insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+        update: () => ({ eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }) }),
+        delete: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }),
+      }),
+      auth: { getSession: () => Promise.resolve({ data: { session: null }, error: null }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }) },
+    } as any;
+  }
+  
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<(User & { profile?: Profile }) | null>(null);
   const [loading, setLoading] = useState(true);
   const demoMode = isDemoMode();
+  const supabase = getSupabase();
+
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    if (error) return null;
+    return data;
+  };
 
   const fetchUser = async () => {
     if (demoMode) {
@@ -64,8 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const session = await account.get();
-      setUser(session as unknown as User);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        setUser({ ...session.user, profile: profile || undefined });
+      } else {
+        setUser(null);
+      }
     } catch {
       setUser(null);
     } finally {
@@ -75,8 +134,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    if (!demoMode) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+if (session?.user) {
+            const profile = await fetchProfile(session.user.id);
+            setUser({ ...session.user, profile: profile || undefined });
+          } else {
+            setUser(null);
+          }
+      });
+      return () => subscription.unsubscribe();
+    }
+  }, [demoMode]);
 
   const login = async (email: string, password: string) => {
     if (demoMode) {
@@ -89,7 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       return;
     }
-    await account.createEmailPasswordSession(email, password);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
     await fetchUser();
   };
 
@@ -103,8 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       return;
     }
-    await account.create(ID.unique(), email, password, name);
-    await account.createEmailPasswordSession(email, password);
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    if (error) throw error;
     await fetchUser();
   };
 
@@ -114,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return;
     }
-    await account.deleteSession("current");
+    await supabase.auth.signOut();
     setUser(null);
   };
 
@@ -122,30 +193,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchUser();
   };
 
-  const updateUser = async (updates: Partial<User> & { prefs?: Partial<UserPrefs> }) => {
+  const updateProfile = async (updates: Partial<Profile>) => {
     if (demoMode) {
       const current = loadDemoUser() ?? user;
       if (!current) return;
-      const next: User = {
-        ...current,
-        ...updates,
-        prefs: { ...current.prefs, ...(updates.prefs ?? {}) },
+      const next: User & { profile: Profile } = { 
+        ...current, 
+        profile: { ...current.profile!, ...updates, id: current.profile?.id || current.id } as Profile
       };
       window.localStorage.setItem(DEMO_USER_KEY, JSON.stringify(next));
       setUser(next);
       return;
     }
-    if (updates.prefs) {
-      await account.updatePrefs({ ...updates.prefs } as unknown as Record<string, unknown>);
-    }
-    if (updates.name) {
-      await account.updateName(updates.name);
-    }
+    if (!user) return;
+    const { error } = await supabase.from("profiles").update(updates).eq("id", user.id);
+    if (error) throw error;
     await fetchUser();
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, demoMode, login, register, logout, refreshUser, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, demoMode, login, register, logout, refreshUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

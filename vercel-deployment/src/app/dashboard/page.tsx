@@ -1,18 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Zap, BarChart2, Key, Brain, Shield, Clock } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { SUBSCRIPTION_TIERS } from "@/lib/appwrite/types";
 import DashboardHeader from "@/components/layout/dashboard-header";
 
-const stats = [
-  { label: "Queries This Month", value: "2,847", change: "+12%", icon: Zap, color: "text-purple-600", bg: "bg-purple-100" },
-  { label: "Avg Latency", value: "1.2s", change: "-0.3s", icon: Clock, color: "text-blue-600", bg: "bg-blue-100" },
-  { label: "CO₂ Saved", value: "342g", change: "+45g", icon: Shield, color: "text-emerald-600", bg: "bg-emerald-100" },
-  { label: "Ensemble Accuracy", value: "94.2%", change: "+1.1%", icon: BarChart2, color: "text-orange-600", bg: "bg-orange-100" },
+const SUBSCRIPTION_TIERS = [
+  { id: "free", name: "Free", price: 0, queriesPerMonth: 100, rateLimit: 10 },
+  { id: "pro", name: "Pro", price: 29, queriesPerMonth: 10000, rateLimit: 100 },
+  { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
 ];
 
 const quickActions = [
@@ -22,8 +21,37 @@ const quickActions = [
   { label: "View Analytics", href: "/dashboard/analytics", icon: BarChart2, color: "bg-orange-600 hover:bg-orange-700" },
 ];
 
+interface Totals {
+  totalQueries: number;
+  avgAccuracy: number;
+  totalCarbonSaved: number;
+  avgLatencyMs: number;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
+  const userId = user?.id || "";
+  const [totals, setTotals] = useState<Totals>({ totalQueries: 0, avgAccuracy: 0, totalCarbonSaved: 0, avgLatencyMs: 0 });
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/analytics");
+        const json = await res.json();
+        if (json.totals) setTotals(json.totals);
+      } catch {
+        // leave defaults
+      }
+    })();
+  }, [userId]);
+
+  const stats = [
+    { label: "Queries This Month", value: totals.totalQueries.toLocaleString(), icon: Zap, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Avg Latency", value: `${(totals.avgLatencyMs / 1000).toFixed(2)}s`, icon: Clock, color: "text-blue-600", bg: "bg-blue-100" },
+    { label: "CO₂ Saved", value: `${totals.totalCarbonSaved}g`, icon: Shield, color: "text-emerald-600", bg: "bg-emerald-100" },
+    { label: "Ensemble Accuracy", value: `${totals.avgAccuracy}%`, icon: BarChart2, color: "text-orange-600", bg: "bg-orange-100" },
+  ];
 
   return (
     <ProtectedRoute>
@@ -42,7 +70,7 @@ export default function DashboardPage() {
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 text-white">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                 <div>
-                  <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name || "Developer"}</h1>
+                  <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.user_metadata?.name || user?.profile?.name || "Developer"}</h1>
                   <p className="text-purple-100 text-lg">
                     Your Multi-LLM ensemble is ready. What will you ask today?
                   </p>
@@ -78,7 +106,6 @@ export default function DashboardPage() {
                     <div className={`${stat.bg} p-3 rounded-xl`}>
                       <stat.icon className={`w-6 h-6 ${stat.color}`} />
                     </div>
-                    <span className="text-sm font-medium text-emerald-600">{stat.change}</span>
                   </div>
                   <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
                   <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
@@ -130,12 +157,12 @@ export default function DashboardPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.4 }}
                   className={`relative rounded-2xl p-6 border-2 transition-all ${
-                    tier.id === user?.prefs?.subscriptionTier
+                    tier.id === user?.profile?.plan
                       ? "border-purple-500 bg-purple-50 shadow-lg shadow-purple-100"
                       : "border-slate-200 hover:border-slate-300"
                   }`}
                 >
-                  {tier.id === user?.prefs?.subscriptionTier && (
+                  {tier.id === user?.profile?.plan && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
                       Current Plan
                     </div>
@@ -158,19 +185,19 @@ export default function DashboardPage() {
                     </li>
                     <li className="flex items-center gap-2 text-slate-600">
                       <span className="w-5 h-5 text-purple-600">✓</span>
-                      {tier.models.length} models available
+                      {3} models available
                     </li>
                   </ul>
-                  <button
-                    className={`w-full py-3 rounded-xl font-semibold transition-colors ${
-                      tier.id === user?.prefs?.subscriptionTier
-                        ? "bg-slate-200 text-slate-600 cursor-not-allowed"
+                  <Link
+                    href="/dashboard/billing"
+                    className={`block text-center w-full py-3 rounded-xl font-semibold transition-colors ${
+                      tier.id === user?.profile?.plan
+                        ? "bg-slate-200 text-slate-600 cursor-not-allowed pointer-events-none"
                         : "bg-purple-600 text-white hover:bg-purple-700"
                     }`}
-                    disabled={tier.id === user?.prefs?.subscriptionTier}
                   >
-                    {tier.id === user?.prefs?.subscriptionTier ? "Current Plan" : tier.price === 0 ? "Start Free" : "Upgrade"}
-                  </button>
+                    {tier.id === user?.profile?.plan ? "Current Plan" : tier.price === 0 ? "Manage Plan" : "Upgrade"}
+                  </Link>
                 </motion.div>
               ))}
             </div>
