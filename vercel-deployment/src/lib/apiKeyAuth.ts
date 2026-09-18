@@ -34,6 +34,6 @@ export async function authenticateApiKey(req: NextRequest): Promise<ApiKeyAuthRe
     userId: record.user_id,
     keyId: record.id,
     tier: record.tier,
-    recordUsage: () => touchPlatformApiKeyUsage(record.id, record.usage_count),
+    recordUsage: () => touchPlatformApiKeyUsage(record.id),
   };
 }

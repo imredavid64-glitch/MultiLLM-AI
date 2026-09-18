@@ -218,6 +218,30 @@ DROP POLICY IF EXISTS "Users can manage own platform API keys" ON public.platfor
 CREATE POLICY "Users can manage own platform API keys" ON public.platform_api_keys
     FOR ALL USING ((SELECT auth.uid()) = user_id);
 
+-- Atomic usage-count increments for both key tables, called only by the
+-- backend's service-role client (never a client-supplied key_id) --
+-- read-modify-write from application code would lose updates under
+-- concurrent requests on the same key.
+CREATE OR REPLACE FUNCTION public.increment_api_key_usage(key_id uuid)
+RETURNS void AS $$
+BEGIN
+    UPDATE public.api_keys
+    SET usage_count = usage_count + 1, last_used_at = now()
+    WHERE id = key_id;
+END;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
+REVOKE ALL ON FUNCTION public.increment_api_key_usage(uuid) FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.increment_platform_api_key_usage(key_id uuid)
+RETURNS void AS $$
+BEGIN
+    UPDATE public.platform_api_keys
+    SET usage_count = usage_count + 1, last_used_at = now()
+    WHERE id = key_id;
+END;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
+REVOKE ALL ON FUNCTION public.increment_platform_api_key_usage(uuid) FROM PUBLIC, anon, authenticated;
+
 -- Multi-tenant client project tracking: an agency user creates one row per
 -- end-client they serve, and queries can be tagged against a project so
 -- usage/quality can be reported per end-client later.

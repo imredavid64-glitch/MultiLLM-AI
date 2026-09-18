@@ -104,10 +104,7 @@ export async function deleteApiKey(id: string): Promise<boolean> {
 }
 
 export async function incrementApiKeyUsage(id: string): Promise<void> {
-  await supabaseServer
-    .from('api_keys')
-    .update({ usage_count: supabaseServer.rpc('increment', { x: 1 }), last_used_at: new Date().toISOString() })
-    .eq('id', id);
+  await supabaseServer.rpc('increment_api_key_usage', { key_id: id });
 }
 
 // Platform API Key operations (gateway keys for programmatic access)
@@ -167,11 +164,8 @@ export async function deletePlatformApiKey(id: string): Promise<boolean> {
   return !error;
 }
 
-export async function touchPlatformApiKeyUsage(id: string, currentUsageCount: number): Promise<void> {
-  await supabaseServer
-    .from('platform_api_keys')
-    .update({ usage_count: currentUsageCount + 1, last_used_at: new Date().toISOString() })
-    .eq('id', id);
+export async function touchPlatformApiKeyUsage(id: string): Promise<void> {
+  await supabaseServer.rpc('increment_platform_api_key_usage', { key_id: id });
 }
 
 // Client project operations (multi-tenant: one row per end-client an agency

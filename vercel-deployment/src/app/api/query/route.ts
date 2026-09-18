@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { MultiLLM } from "@/lib/multi-llm";
-import { getProfile, decrementCredits, getApiKeys, getClientProject } from "@/lib/supabase/services";
+import { getProfile, decrementCredits, getApiKeys, getClientProject, incrementApiKeyUsage } from "@/lib/supabase/services";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 import { checkRateLimit, getClientIp, type Tier } from "@/lib/rateLimiter";
@@ -18,16 +18,25 @@ async function loadUserProviderKeys(userId: string): Promise<Record<string, stri
   if (!rows.length) return null;
 
   const grouped: Record<string, string[]> = {};
+  const usedRowIds: string[] = [];
   for (const row of rows) {
     try {
       const plaintext = await decryptApiKey(row.encrypted_key);
       grouped[row.provider] = [...(grouped[row.provider] || []), plaintext];
+      usedRowIds.push(row.id);
     } catch {
       // Skip a key that fails to decrypt (e.g. rotated ENCRYPTION_KEY)
       // rather than failing the whole query.
     }
   }
-  return Object.keys(grouped).length ? grouped : null;
+  if (!Object.keys(grouped).length) return null;
+
+  // Best-effort usage tracking -- a key that's included in this request's
+  // provider stack counts as "used" even if the ensemble ends up not
+  // drawing a candidate from it; never block the actual query on this.
+  Promise.all(usedRowIds.map((id) => incrementApiKeyUsage(id))).catch(() => {});
+
+  return grouped;
 }
 
 export const runtime = "nodejs";

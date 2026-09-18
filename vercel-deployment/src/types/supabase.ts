@@ -292,6 +292,8 @@ export interface Database {
     Functions: {
       handle_new_user: { Args: Record<PropertyKey, never>; Returns: unknown };
       update_updated_at_column: { Args: Record<PropertyKey, never>; Returns: unknown };
+      increment_api_key_usage: { Args: { key_id: string }; Returns: void };
+      increment_platform_api_key_usage: { Args: { key_id: string }; Returns: void };
     };
     Enums: {
       plan_type: 'free' | 'pro' | 'enterprise';
