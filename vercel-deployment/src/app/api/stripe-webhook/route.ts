@@ -21,6 +21,16 @@ const PLAN_CREDITS = {
   enterprise: 100000,
 };
 
+// Stripe moved current_period_start/end off Stripe.Subscription and onto
+// each Stripe.SubscriptionItem as of the API version this SDK (v22) defaults
+// to -- reading it off the subscription itself is `undefined`, and
+// `new Date(undefined * 1000)` throws RangeError: Invalid time value,
+// crashing this handler on every real subscription.created/updated event.
+function getCurrentPeriodEnd(subscription: Stripe.Subscription): string | null {
+  const periodEnd = subscription.items.data[0]?.current_period_end;
+  return periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
+}
+
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
   const subscriptionId = subscription.id;
@@ -46,7 +56,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     stripe_subscription_id: subscriptionId,
     plan,
     status: subscription.status,
-    current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
+    current_period_end: getCurrentPeriodEnd(subscription),
     credits_included: credits,
     updated_at: new Date().toISOString(),
   };
@@ -79,7 +89,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     stripe_subscription_id: subscriptionId,
     plan,
     status: subscription.status,
-    current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
+    current_period_end: getCurrentPeriodEnd(subscription),
     credits_included: credits,
     updated_at: new Date().toISOString(),
   };
@@ -115,9 +125,21 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Downgraded user ${sub.user_id} to free`);
 }
 
+// Invoice.subscription was removed in favor of
+// invoice.parent.subscription_details.subscription (which can come back
+// as either a plain id or an expanded Subscription object) -- the old
+// top-level field is always undefined on this API version, which made
+// handleInvoicePaymentSucceeded's `if (!subscriptionId) return;` guard
+// fire on every real invoice and silently skip the credit reset entirely.
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const subscription = invoice.parent?.subscription_details?.subscription;
+  if (!subscription) return null;
+  return typeof subscription === "string" ? subscription : subscription.id;
+}
+
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
-  const subscriptionId = (invoice as any).subscription as string;
+  const subscriptionId = getInvoiceSubscriptionId(invoice);
 
   if (!subscriptionId) return;
 
