@@ -1,61 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CreditCard, Calendar, Download, ArrowRight, Check, Crown, Zap, Users, Shield, AlertCircle } from "lucide-react";
+import { CreditCard, Calendar, ExternalLink, Crown, Zap, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/layout/dashboard-header";
-import { SUBSCRIPTION_TIERS, SubscriptionTier } from "@/lib/appwrite/types";
+import { getSupabase } from "@/lib/supabase/client";
 
-const mockSubscription = {
-  id: "sub_123456",
-  tier: "pro" as const,
-  status: "active" as const,
-  currentPeriodEnd: "2024-04-15T00:00:00Z",
-  cancelAtPeriodEnd: false,
-  paymentMethod: "**** **** **** 4567",
-  nextBilling: "2024-02-15T00:00:00Z",
-};
-
-const mockInvoices = [
-  {
-    id: "inv_001",
-    date: "2024-01-15T00:00:00Z",
-    amount: 29.00,
-    status: "paid" as const,
-    period: "Jan 2024",
-  },
-  {
-    id: "inv_002",
-    date: "2023-12-15T00:00:00Z",
-    amount: 29.00,
-    status: "paid" as const,
-    period: "Dec 2023",
-  },
-  {
-    id: "inv_003",
-    date: "2023-11-15T00:00:00Z",
-    amount: 29.00,
-    status: "paid" as const,
-    period: "Nov 2023",
-  },
+const SUBSCRIPTION_TIERS: Array<{ id: "free" | "pro" | "enterprise"; name: string; price: number; queriesPerMonth: number; rateLimit: number }> = [
+  { id: "free", name: "Free", price: 0, queriesPerMonth: 100, rateLimit: 10 },
+  { id: "pro", name: "Pro", price: 29, queriesPerMonth: 10000, rateLimit: 100 },
+  { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
 ];
 
-const mockUsage = [
-  { month: "Jan", queries: 2847, limit: 10000, percentage: 28.5 },
-  { month: "Feb", queries: 9500, limit: 10000, percentage: 95 },
-  { month: "Mar", queries: 8200, limit: 10000, percentage: 82 },
-  { month: "Apr", queries: 7500, limit: 10000, percentage: 75 },
-  { month: "May", queries: 6800, limit: 10000, percentage: 68 },
-  { month: "Jun", queries: 7100, limit: 10000, percentage: 71 },
-];
+interface SubscriptionRow {
+  plan: "free" | "pro" | "enterprise";
+  status: "active" | "canceled" | "past_due" | "trialing";
+  current_period_end: string | null;
+  credits_included: number;
+}
 
 export default function BillingPage() {
-  const { user } = useAuth();
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
+  const { user, demoMode } = useAuth();
+  const userId = user?.id || "";
+
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionPending, setActionPending] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId || demoMode) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      const supabase = getSupabase();
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("plan, status, current_period_end, credits_included")
+        .eq("user_id", userId)
+        .single();
+      setSubscription((data as SubscriptionRow) || null);
+      setLoading(false);
+    })();
+  }, [userId, demoMode]);
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -69,26 +59,67 @@ export default function BillingPage() {
     }
   };
 
-  const handleUpgrade = (tierId: string) => {
-    console.log("Upgrading to tier:", tierId);
-    // In a real app, this would redirect to a payment gateway
-    toast.success("Redirecting to payment...");
+  const handleUpgrade = async (tierId: "free" | "pro" | "enterprise") => {
+    if (!userId) return;
+    if (demoMode) {
+      toast.error("Billing requires a real account (demo mode has no payment backend).");
+      return;
+    }
+    // There's no direct "downgrade to free" endpoint -- cancelling in the
+    // Stripe billing portal is what actually drops a subscriber back to
+    // free (the webhook handles the plan change from there), so route
+    // there instead of silently doing nothing.
+    if (tierId === "free") {
+      await handleManageBilling();
+      return;
+    }
+    setActionPending(tierId);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: tierId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Checkout failed");
+      window.location.href = data.url;
+    } catch (err: any) {
+      toast.error(err.message || "Could not start checkout");
+      setActionPending(null);
+    }
   };
 
-  const handleCancel = () => {
-    console.log("Canceling subscription. Reason:", cancelReason);
-    setShowCancelModal(false);
-    toast.success("Subscription will be canceled at the end of the billing period");
+  const handleManageBilling = async () => {
+    if (!userId) return;
+    if (demoMode) {
+      toast.error("Billing requires a real account (demo mode has no payment backend).");
+      return;
+    }
+    setActionPending("portal");
+    try {
+      const res = await fetch("/api/billing-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing portal");
+      window.location.href = data.url;
+    } catch (err: any) {
+      toast.error(err.message || "Could not open billing portal");
+      setActionPending(null);
+    }
   };
+
+  const currentPlan = subscription?.plan || user?.profile?.plan || "free";
+  const credits = user?.profile?.credits ?? 0;
+  const planLimit = SUBSCRIPTION_TIERS.find((t) => t.id === currentPlan)?.queriesPerMonth ?? 100;
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50">
         <DashboardHeader />
 
-        {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Page Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -102,7 +133,6 @@ export default function BillingPage() {
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Current Subscription */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -115,56 +145,43 @@ export default function BillingPage() {
                   Current Subscription
                 </h2>
 
-                {mockSubscription ? (
+                {loading ? (
+                  <div className="text-center py-8 text-slate-500">Loading...</div>
+                ) : (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Status</span>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(mockSubscription.status)}`}>{mockSubscription.status}</span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(subscription?.status || "active")}`}>
+                        {subscription?.status || "active"}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Tier</span>
-                      <span className="font-semibold text-slate-900 capitalize">{mockSubscription.tier}</span>
+                      <span className="text-slate-600">Plan</span>
+                      <span className="font-semibold text-slate-900 capitalize">{currentPlan}</span>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Next Billing</span>
-                      <span className="font-semibold text-slate-900">{formatDate(mockSubscription.nextBilling)}</span>
-                    </div>
+                    {subscription?.current_period_end && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Renews</span>
+                        <span className="font-semibold text-slate-900">{formatDate(subscription.current_period_end)}</span>
+                      </div>
+                    )}
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Payment Method</span>
-                      <span className="font-semibold text-slate-900">{mockSubscription.paymentMethod}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Renews</span>
-                      <span className="font-semibold text-slate-900">{mockSubscription.cancelAtPeriodEnd ? "On next period" : "Automatically"}</span>
-                    </div>
-
-                    <button
-                      onClick={() => setShowCancelModal(true)}
-                      className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-semibold transition-colors"
-                    >
-                      Cancel Subscription
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <CreditCard className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-slate-900 mb-2">No Active Subscription</h3>
-                    <p className="text-slate-500 mb-6">Upgrade to Pro or Enterprise to unlock full features</p>
-                    <button
-                      onClick={() => handleUpgrade("pro")}
-                      className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors"
-                    >
-                      Upgrade to Pro - $29/month
-                    </button>
+                    {currentPlan !== "free" && !demoMode && (
+                      <button
+                        onClick={handleManageBilling}
+                        disabled={actionPending === "portal"}
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {actionPending === "portal" ? "Opening..." : "Manage Billing / Cancel"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Usage Summary */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -176,57 +193,34 @@ export default function BillingPage() {
                   Usage This Month
                 </h2>
 
-                {user?.prefs?.subscriptionTier === "free" ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Free Tier Limits</h3>
-                    <p className="text-slate-600 mb-4">100 queries / month</p>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div
-                        className="bg-yellow-500 h-2 rounded-full"
-                        style={{ width: `${(user?.prefs?.monthlyQueries || 0) / 100 * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-sm text-slate-500 mt-2">
-                      {user?.prefs?.monthlyQueries || 0} / {user?.prefs?.subscriptionTier === "free" ? "100" : "10,000"} queries used
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Used This Month</span>
-                      <span className="font-semibold text-slate-900">{user?.prefs?.monthlyQueries || 0}</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div
-                        className="bg-purple-600 h-2 rounded-full"
-                        style={{ width: `${Math.min(((user?.prefs?.monthlyQueries || 0) / 10000) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Limit</span>
-                      <span className="font-semibold text-slate-900">10,000 queries</span>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  className="w-full mt-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Usage Report
-                </button>
+                <div className="text-center py-4">
+                  {planLimit === -1 ? (
+                    <p className="text-slate-600">Unlimited queries on the Enterprise plan</p>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                      <p className="text-slate-600 mb-4">{planLimit.toLocaleString()} queries / month</p>
+                      <div className="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                          className="bg-purple-600 h-2 rounded-full"
+                          style={{ width: `${Math.min((credits / planLimit) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-sm text-slate-500 mt-2">
+                        {credits.toLocaleString()} / {planLimit.toLocaleString()} credits remaining
+                      </p>
+                    </>
+                  )}
+                </div>
               </motion.div>
             </motion.div>
 
-            {/* Subscription Plans & Invoices */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
               className="lg:col-span-2"
             >
-              {/* Subscription Plans */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-8">
                 <h2 className="text-xl font-semibold text-slate-900 mb-6">Choose Your Plan</h2>
 
@@ -237,13 +231,13 @@ export default function BillingPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: 0.4 }}
-                      className={`p-6 rounded-2xl border-2 transition-all ${
-                        tier.id === user?.prefs?.subscriptionTier
+                      className={`p-6 rounded-2xl border-2 transition-all relative ${
+                        tier.id === currentPlan
                           ? "border-purple-500 bg-purple-50 shadow-lg"
                           : "border-slate-200 hover:border-slate-300"
                       }`}
                     >
-                      {tier.id === user?.prefs?.subscriptionTier && (
+                      {tier.id === currentPlan && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
                           Current Plan
                         </div>
@@ -268,11 +262,11 @@ export default function BillingPage() {
                         </li>
                         <li className="flex items-center gap-2 text-sm text-slate-600">
                           <span className="w-5 h-5 text-purple-600">✓</span>
-                          {tier.models.length} models available
+                          Multiple models available
                         </li>
                       </ul>
 
-                      {tier.id === user?.prefs?.subscriptionTier ? (
+                      {tier.id === currentPlan ? (
                         <button
                           className="w-full py-3 bg-slate-200 text-slate-600 rounded-xl font-semibold cursor-not-allowed"
                           disabled
@@ -282,9 +276,10 @@ export default function BillingPage() {
                       ) : (
                         <button
                           onClick={() => handleUpgrade(tier.id)}
-                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors"
+                          disabled={actionPending === tier.id}
+                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
                         >
-                          {tier.price === 0 ? "Start Free" : "Upgrade"}
+                          {actionPending === tier.id ? "Redirecting..." : tier.price === 0 ? "Downgrade" : "Upgrade"}
                         </button>
                       )}
                     </motion.div>
@@ -292,113 +287,29 @@ export default function BillingPage() {
                 </div>
               </div>
 
-              {/* Recent Invoices */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-purple-600" />
-                  Recent Invoices
+                  Invoices & Payment Methods
                 </h2>
-
-                <div className="divide-y divide-slate-100">
-                  {mockInvoices.map((invoice) => (
-                    <div key={invoice.id} className="py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${invoice.status === "paid" ? "bg-emerald-100" : "bg-slate-100"}`}>
-                          <Calendar className={`w-4 h-4 ${invoice.status === "paid" ? "text-emerald-600" : "text-slate-600"}`} />
-                        </div>
-                        <div>
-                          <div className="font-semibold text-slate-900">Invoice {invoice.id}</div>
-                          <div className="text-sm text-slate-500">{invoice.period}</div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="font-semibold text-slate-900">${invoice.amount.toFixed(2)}</div>
-                          <div className="text-sm text-slate-500">{formatDate(invoice.date)}</div>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>{invoice.status}</span>
-                        <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-                          <Download className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button className="w-full mt-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Download All Invoices
-                </button>
+                <p className="text-slate-600 mb-4">
+                  Invoices, payment methods, and past charges are managed securely through Stripe.
+                </p>
+                {currentPlan !== "free" && !demoMode ? (
+                  <button
+                    onClick={handleManageBilling}
+                    className="py-3 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Open Billing Portal
+                  </button>
+                ) : (
+                  <p className="text-sm text-slate-500">Upgrade to a paid plan to view invoices.</p>
+                )}
               </div>
             </motion.div>
           </div>
         </main>
-
-        {/* Cancel Subscription Modal */}
-        {showCancelModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowCancelModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl p-6 w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">Cancel Subscription</h2>
-              <p className="text-slate-600 mb-6">Are you sure? You'll lose access to all Pro features at the end of your billing period.</p>
-
-              <div className="mb-6">
-                <label htmlFor="cancelReason" className="block text-sm font-medium text-slate-700 mb-2">
-                  Reason for cancellation (optional)
-                </label>
-                <textarea
-                  id="cancelReason"
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="Help us improve by telling us why you're leaving..."
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all h-24 resize-none"
-                />
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-xl mb-6">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">Current plan:</span>
-                  <span className="font-semibold text-slate-900 capitalize">{mockSubscription?.tier}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-1">
-                  <span className="text-slate-600">Next billing:</span>
-                  <span className="font-semibold text-slate-900">{mockSubscription?.nextBilling ? formatDate(mockSubscription.nextBilling) : "N/A"}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-1">
-                  <span className="text-slate-600">Access until:</span>
-                  <span className="font-semibold text-slate-900">{mockSubscription?.currentPeriodEnd ? formatDate(mockSubscription.currentPeriodEnd) : "N/A"}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCancelModal(false)}
-                  className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
-                >
-                  Keep Subscription
-                </button>
-                <button
-                  onClick={handleCancel}
-                  className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-colors"
-                >
-                  Cancel Subscription
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
       </div>
     </ProtectedRoute>
   );

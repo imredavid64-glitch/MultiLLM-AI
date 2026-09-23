@@ -8,16 +8,18 @@ Evaluates:
 Usage:
   python -m train.eval_models
 """
+
 from __future__ import annotations
 
 import json
 import re
 import time
 from pathlib import Path
+from typing import Any, Dict, List
 
 import torch
 
-from ai_client import SourceIndex, bias_score, clarity_score, format_sources_for_prompt, source_support_score
+from ai_client import SourceIndex, bias_score, clarity_score, source_support_score
 from local_models import LocalModels, model_score_answer
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -58,7 +60,7 @@ def generate(question: str, max_new: int = 450, temperature: float = 0.5) -> str
     seed = torch.tensor([ids], dtype=torch.long)
     with torch.no_grad():
         out = model.generate(seed, max_new_tokens=max_new, temperature=temperature, top_k=40)
-    text = tok.decode(out[0].tolist()[len(ids):])
+    text = tok.decode(out[0].tolist()[len(ids) :])
     for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
         idx = text.find(marker)
         if idx != -1:
@@ -91,7 +93,7 @@ def measure_style(text: str) -> dict:
 
 
 def run_generator_tests() -> dict:
-    results = {"trained": [], "novel": []}
+    results: Dict[str, List[Dict[str, Any]]] = {"trained": [], "novel": []}
     for label, questions in (("trained", TRAINED_QUESTIONS), ("novel", NOVEL_QUESTIONS)):
         for q in questions:
             t0 = time.time()
@@ -105,8 +107,8 @@ def run_generator_tests() -> dict:
 def run_scorer_tests() -> dict:
     labels_path = BASE_DIR / "train" / "data" / "scorer_labels.json"
     rows = json.loads(labels_path.read_text(encoding="utf-8"))
-    per_dim = {"source_support": [], "bias_score": [], "clarity_score": []}
-    class_errors = {}
+    per_dim: Dict[str, List[float]] = {"source_support": [], "bias_score": [], "clarity_score": []}
+    class_errors: Dict[str, List[float]] = {}
     for r in rows:
         pred = model_score_answer(r["text"])
         if pred is None:
@@ -117,14 +119,17 @@ def run_scorer_tests() -> dict:
         # class by label fingerprint
         t = (r["source_support"], r["bias_score"], r["clarity_score"])
         cls = _classify(t)
-        class_errors.setdefault(cls, []).append(abs(pred[0] - r["source_support"]) + abs(pred[1] - r["bias_score"]) + abs(pred[2] - r["clarity_score"]))
+        class_errors.setdefault(cls, []).append(
+            abs(pred[0] - r["source_support"]) + abs(pred[1] - r["bias_score"]) + abs(pred[2] - r["clarity_score"])
+        )
 
-    report = {"n": len(rows), "mae_per_dim": {}, "class_mae": {}}
+    mae_per_dim: Dict[str, float] = {}
+    class_mae: Dict[str, float] = {}
     for dim, errs in per_dim.items():
-        report["mae_per_dim"][dim] = round(sum(errs) / len(errs), 4)
+        mae_per_dim[dim] = round(sum(errs) / len(errs), 4)
     for cls, errs in sorted(class_errors.items()):
-        report["class_mae"][cls] = round(sum(errs) / len(errs), 3)
-    return report
+        class_mae[cls] = round(sum(errs) / len(errs), 3)
+    return {"n": len(rows), "mae_per_dim": mae_per_dim, "class_mae": class_mae}
 
 
 def _classify(t: tuple) -> str:
@@ -147,7 +152,6 @@ def run_e2e() -> dict:
     index.refresh()
     t0 = time.time()
     sources = index.retrieve("How does a multi-LLM ensemble improve answer quality?", top_k=3)
-    ctx = format_sources_for_prompt(sources)
     text = generate("How does a multi-LLM ensemble improve answer quality?")
     s, b, c = source_support_score(text, sources), bias_score(text), clarity_score(text)
     learned = model_score_answer(text)

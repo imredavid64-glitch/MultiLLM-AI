@@ -7,7 +7,8 @@
     "n_layer": 6,
     "n_head": 4,
     "n_embd": 128,
-    "params": 1395328
+    "params": 1395328,
+    "error": "[Errno 2] No such file or directory: 'C:\\\\Users\\\\david\\\\Desktop\\\\MultiLLM\\\\models\\\\ensemble-generator\\\\config.json'"
   },
   "scorer": {
     "name": "ensemble-scorer",
@@ -17,11 +18,27 @@
     "n_embd": 96,
     "n_layer": 2,
     "n_head": 3,
-    "params": 351971
+    "params": 351971,
+    "error": "[Errno 2] No such file or directory: 'C:\\\\Users\\\\david\\\\Desktop\\\\MultiLLM\\\\models\\\\ensemble-scorer\\\\config.json'"
+  },
+  "refiner": {
+    "name": "prompt-refiner",
+    "kind": "refiner",
+    "vocab_size": 380,
+    "block_size": 96,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 96,
+    "params": 491712
   },
   "corpus": {
     "docs": 2344,
     "chars": 2747164,
     "version": 4
+  },
+  "refiner_corpus": {
+    "docs": 781,
+    "chars": 127725,
+    "version": 1
   }
 }

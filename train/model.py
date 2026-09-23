@@ -8,6 +8,7 @@ Two artifacts are produced by this package:
   1. A causal language model (the offline "ensemble candidate" generator).
   2. A small regressor that scores answers for source support, bias, clarity.
 """
+
 from __future__ import annotations
 
 import json
@@ -130,6 +131,8 @@ class LayerNorm(nn.Module):
 
 
 class SelfAttention(nn.Module):
+    causal_mask: torch.Tensor
+
     def __init__(self, n_embd: int, n_head: int, block_size: int, dropout: float) -> None:
         super().__init__()
         assert n_embd % n_head == 0
@@ -195,11 +198,10 @@ class TinyGPT(nn.Module):
         super().__init__()
         self.block_size = block_size
         self.n_embd = n_embd
+        self.n_head = n_head
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
         self.position_embedding = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.ModuleList(
-            [TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)]
-        )
+        self.blocks = nn.ModuleList([TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)])
         self.ln_f = LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size, bias=False)
         self.token_embedding.weight = self.lm_head.weight
@@ -260,7 +262,7 @@ class TinyGPT(nn.Module):
                     "vocab_size": self.token_embedding.num_embeddings,
                     "block_size": self.block_size,
                     "n_layer": len(self.blocks),
-                    "n_head": self.blocks[0].attn.n_head if self.blocks else 0,
+                    "n_head": self.n_head,
                     "n_embd": self.n_embd,
                     "kind": "generator",
                 },
@@ -308,9 +310,7 @@ class TinyScorer(nn.Module):
         self.n_head = n_head
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
         self.position_embedding = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.ModuleList(
-            [TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)]
-        )
+        self.blocks = nn.ModuleList([TransformerBlock(n_embd, n_head, block_size, dropout) for _ in range(n_layer)])
         self.ln_f = LayerNorm(n_embd)
         self.head = nn.Sequential(
             nn.Linear(n_embd, 32),
@@ -341,7 +341,7 @@ class TinyScorer(nn.Module):
                     "block_size": self.block_size,
                     "n_embd": self.n_embd,
                     "n_layer": len(self.blocks),
-                    "n_head": self.blocks[0].attn.n_head if self.blocks else 0,
+                    "n_head": self.n_head,
                     "kind": "scorer",
                 },
                 indent=1,

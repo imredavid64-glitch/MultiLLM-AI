@@ -28,6 +28,13 @@ dist/
 .idea/
 .vercel
 
+# Local AI-agent tooling (per-developer, not app code) -- .mcp.json is
+# intentionally NOT here: it's the project-scoped MCP server config, meant
+# to be shared with the team.
+.claude/
+.agents/
+skills-lock.json
+
 # Node / Next.js
 node_modules/
 .next/
@@ -35,7 +42,6 @@ next-env.d.ts
 *.tsbuildinfo
 vercel-deployment/.next/
 vercel-deployment/node_modules/
-vercel-deployment/package-lock.json
 
 # Trained model artifacts (reproducible via python -m train.train)
 models/

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiLLM — Ensemble AI Platform</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">M</div>
+    <span>MultiLLM</span>
+  </div>
+  <div class="nav">
+    <button class="active" onclick="showSection('try')">Try It</button>
+    <button onclick="showSection('tests')">Test Suite</button>
+    <button onclick="showSection('settings')">Settings</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- TRY IT SECTION -->
+  <div id="section-try" class="section active">
+    <div class="hero">
+      <h1>Ensemble AI — Try It Now</h1>
+      <p>Your prompt is sent to multiple AI models in parallel. Each response is scored for source support, bias, and clarity — then the best parts are merged into one superior answer.</p>
+    </div>
+
+    <div class="status-bar" id="provider-status">
+      <div class="status-chip"><div class="status-dot loading" id="dot-gemini"></div>Gemini</div>
+      <div class="status-chip"><div class="status-dot loading" id="dot-groq"></div>Groq</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Ask anything</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" onclick="clearChat()">Clear</button>
+        </div>
+      </div>
+      <div class="input-group">
+        <textarea id="user-prompt" placeholder="Type your question here... (Enter to send, Shift+Enter for newline)" rows="3"></textarea>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:.8rem;color:var(--text3)"><input type="checkbox" id="privacy-toggle" checked> Privacy redaction</label>
+          <label style="font-size:.8rem;color:var(--text3)"><input type="checkbox" id="show-candidates" checked> Show candidates</label>
+        </div>
+        <button class="btn btn-primary" id="send-btn" onclick="sendPrompt()">Send to Ensemble</button>
+      </div>
+    </div>
+
+    <div id="progress-container" style="display:none">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div style="font-size:.8rem;color:var(--text3);text-align:center" id="progress-text">Initializing...</div>
+    </div>
+
+    <div id="results-container"></div>
+  </div>
+
+  <!-- TEST SUITE SECTION -->
+  <div id="section-tests" class="section">
+    <div class="hero">
+      <h1>AI Test Suite</h1>
+      <p>Run predefined tests against the ensemble to evaluate accuracy, bias detection, privacy, source citation, and clarity.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-primary" id="run-all-btn" onclick="runAllTests()">Run All Tests</button>
+      <button class="btn btn-secondary" onclick="resetTests()">Reset</button>
+      <div style="flex:1"></div>
+      <div id="test-summary" style="display:flex;gap:12px;align-items:center;font-size:.85rem;color:var(--text2)"></div>
+    </div>
+
+    <div class="test-grid" id="test-grid"></div>
+    <div id="test-detail-container"></div>
+  </div>
+
+  <!-- SETTINGS SECTION -->
+  <div id="section-settings" class="section">
+    <div class="hero">
+      <h1>Settings</h1>
+      <p>Configure providers, generation parameters, and ensemble behavior.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">API Keys</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label class="setting-label">Gemini API Key</label>
+          <input class="setting-input" id="cfg-gemini-key" type="password" value="">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Gemini Model</label>
+          <input class="setting-input" id="cfg-gemini-model" value="gemini-2.5-flash">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Groq API Key</label>
+          <input class="setting-input" id="cfg-groq-key" type="password" value="">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Groq Model</label>
+          <input class="setting-input" id="cfg-groq-model" value="qwen/qwen3.8-27b">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Ensemble Config</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label class="setting-label">Bot Count (2-8)</label>
+          <input class="setting-input" id="cfg-bot-count" type="number" min="2" max="8" value="4">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Temperature</label>
+          <input class="setting-input" id="cfg-temperature" type="number" min="0" max="2" step="0.05" value="0.3">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Max Tokens</label>
+          <input class="setting-input" id="cfg-max-tokens" type="number" min="64" max="4096" step="64" value="1024">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Synthesis Temperature</label>
+          <input class="setting-input" id="cfg-synth-temp" type="number" min="0" max="1" step="0.05" value="0.1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Scoring Weights</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label class="setting-label">Source Support Weight</label>
+          <input class="setting-input" id="cfg-w-source" type="number" min="0" max="1" step="0.05" value="0.50">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Bias Weight</label>
+          <input class="setting-input" id="cfg-w-bias" type="number" min="0" max="1" step="0.05" value="0.25">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Clarity Weight</label>
+          <input class="setting-input" id="cfg-w-clarity" type="number" min="0" max="1" step="0.05" value="0.25">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:16px">Knowledge Sources</div>
+      <p style="font-size:.85rem;color:var(--text3);margin-bottom:12px">Built-in knowledge base files loaded into the ensemble:</p>
+      <div id="sources-list" style="font-size:.85rem;color:var(--text2)"></div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -11,13 +11,13 @@ Because knowledge_sources/ is empty, we generate a deterministic synthetic
 corpus that teaches those patterns. The same generator produces labeled
 examples for the answer-quality scorer.
 """
+
 from __future__ import annotations
 
-import itertools
 import json
 import random
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 PERSONAS = [
     ("Factual Analyst", "Prioritize precise facts and explicit assumptions."),
@@ -570,7 +570,6 @@ def _build_knowledge_docs() -> List[str]:
         return []
 
     title_re = re.compile(r"^#\s+(.+)$", re.MULTILINE)
-    sections_re = re.compile(r"^##\s+(.+)$", re.MULTILINE)
     docs: List[str] = []
     for path in sorted(base.glob("*.md")):
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -680,10 +679,7 @@ def write_corpus_json(path: Path, docs: List[str]) -> None:
 
 def write_scorer_json(path: Path, rows: List[Tuple[str, float, float, float]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = [
-        {"text": text, "source_support": a, "bias_score": b, "clarity_score": c}
-        for text, a, b, c in rows
-    ]
+    data = [{"text": text, "source_support": a, "bias_score": b, "clarity_score": c} for text, a, b, c in rows]
     path.write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
 
 

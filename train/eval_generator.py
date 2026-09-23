@@ -7,10 +7,9 @@ the training data?
 Usage:
   python -m train.eval_generator
 """
+
 from __future__ import annotations
 
-import json
-import random
 from pathlib import Path
 
 import torch
@@ -57,7 +56,7 @@ def main() -> None:
         seed = torch.tensor([ids], dtype=torch.long)
         with torch.no_grad():
             out = model.generate(seed, max_new_tokens=450, temperature=0.5, top_k=40)
-        text = tokenizer.decode(out[0].tolist()[len(ids):])
+        text = tokenizer.decode(out[0].tolist()[len(ids) :])
         for marker in ("<|end|>", "<|endoftext|>", "<|user|>"):
             idx = text.find(marker)
             if idx != -1:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -10,37 +11,45 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Protocol, Sequence, Set, Tuple
+from types import ModuleType
+from typing import Any, Dict, List, Protocol, Sequence, Set, Tuple
+
 """
 OPENAI API KEY used from OPENROUTER, and a GEMINI API KEY used from GOOGLE AI STUDIO
 """
 try:
-    from openai import OpenAI
+    from openai import OpenAI, APIError, APITimeoutError, RateLimitError
 except Exception:
     print("Install/upgrade the OpenAI SDK first: pip install -U openai")
     raise
 
+httpx: "ModuleType | None"
 try:
-    from openai import APIError, APITimeoutError, RateLimitError
-except Exception:
-    APIError = Exception
-    APITimeoutError = Exception
-    RateLimitError = Exception
+    import httpx as _httpx
 
-try:
-    import httpx
+    httpx = _httpx
 except Exception:
     httpx = None
+
+# Library logging: attach a NullHandler so importing this module (e.g. from
+# the FastAPI query-ensemble function) produces zero output by default --
+# the host application configures real handlers/levels if it wants any.
+# main() below turns on console output when run as the interactive CLI.
+logger = logging.getLogger("ai_client")
+if not logger.handlers:
+    logger.addHandler(logging.NullHandler())
 
 
 BASE_DIR = Path(__file__).resolve().parent
 HISTORY_FILE = BASE_DIR / "chat_history.json"
 SOURCES_DIR = BASE_DIR / "knowledge_sources"
 
+
 # Optional local env file (gitignored) holding provider keys.
 #   OPENAI_API_KEY / OPENAI_API_KEYS  (OpenRouter: sk-or-v1-...)
 #   GEMINI_API_KEY / GEMINI_API_KEYS
 #   MISTRAL_API_KEY / MISTRAL_API_KEYS
+#   GROQ_API_KEY / GROQ_API_KEYS
 def load_env_file(path: Path | None = None) -> None:
     source = path or (BASE_DIR / ".env")
     if not source.exists():
@@ -66,12 +75,15 @@ DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_MISTRAL_MODEL = "mistral-small-latest"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Provider keys are loaded ONLY from environment variables or key files.
 # No keys are hardcoded here. Set at least one of the env vars below:
 #   OPENAI_API_KEYS / OPENAI_API_KEY / OPENAI_API_KEYS_FILE
 #   GEMINI_API_KEYS / GEMINI_API_KEY / GEMINI_API_KEYS_FILE
 #   MISTRAL_API_KEYS / MISTRAL_API_KEY / MISTRAL_API_KEYS_FILE
+#   GROQ_API_KEYS / GROQ_API_KEY / GROQ_API_KEYS_FILE
 
 MAX_RETRIES = 4
 MAX_HISTORY_MESSAGES = 12
@@ -223,16 +235,14 @@ class ChatProvider(Protocol):
     name: str
     model: str
 
-    def size(self) -> int:
-        ...
+    def size(self) -> int: ...
 
     def chat(
         self,
         messages: Sequence[Dict[str, str]],
         temperature: float,
-        gen: "GenerationConfig | None" = None,
-    ) -> str:
-        ...
+        gen_p: "GenerationConfig | None" = None,
+    ) -> str: ...
 
 
 @dataclass
@@ -450,13 +460,16 @@ class OpenAIProvider:
     def __init__(self, api_keys: Sequence[str], model: str, base_url: str = "") -> None:
         self.model = model
         self.base_url = base_url.strip()
-        self.name = "OpenRouter (OpenAI API)" if "openrouter.ai" in self.base_url else "OpenAI-compatible"
-        self._clients = []
+        if "openrouter.ai" in self.base_url:
+            self.name = "OpenRouter (OpenAI API)"
+        elif "groq.com" in self.base_url:
+            self.name = "Groq (OpenAI API)"
+        else:
+            self.name = "OpenAI-compatible"
+        self._clients: List[OpenAI] = []
         for key in api_keys:
-            kwargs = {"api_key": key}
-            if self.base_url:
-                kwargs["base_url"] = self.base_url
-            self._clients.append(OpenAI(**kwargs))
+            client = OpenAI(api_key=key, base_url=self.base_url) if self.base_url else OpenAI(api_key=key)
+            self._clients.append(client)
         self._cursor = 0
         self._lock = threading.Lock()
 
@@ -475,7 +488,7 @@ class OpenAIProvider:
         temperature: float,
         gen_p: "GenerationConfig | None" = None,
     ) -> str:
-        kwargs = {"model": self.model, "messages": list(messages), "temperature": temperature}
+        kwargs: Dict[str, Any] = {"model": self.model, "messages": list(messages), "temperature": temperature}
         if gen_p is None:
             gen_p = GenerationConfig(temperature=temperature)
         if gen_p.max_tokens is not None:
@@ -485,7 +498,7 @@ class OpenAIProvider:
         if gen_p.repetition_penalty is not None:
             kwargs["frequency_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
             kwargs["presence_penalty"] = 0.0
-        last_error = None
+        last_error: Exception | None = None
         for attempt in range(MAX_RETRIES):
             client = self._next_client()
             try:
@@ -496,10 +509,13 @@ class OpenAIProvider:
                 last_error = RuntimeError("Empty response from OpenAI-compatible provider")
             except (RateLimitError, APITimeoutError, APIError) as exc:
                 last_error = exc
-                time.sleep(2 ** attempt)
+                logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
+                time.sleep(2**attempt)
             except Exception as exc:
                 last_error = exc
-                time.sleep(2 ** attempt)
+                logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
+                time.sleep(2**attempt)
+        logger.error("%s call failed after %d retries: %s", self.name, MAX_RETRIES, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
 
@@ -554,15 +570,15 @@ class GeminiProvider:
             gen_config["topK"] = gen_p.top_k
         if gen_p.max_tokens is not None:
             gen_config["maxOutputTokens"] = gen_p.max_tokens
-        last_error = None
+        last_error: Exception | None = None
         for candidate_model in self._model_candidates:
             model_name = urllib.parse.quote(candidate_model, safe="")
             for attempt in range(MAX_RETRIES):
                 key = self._keys.next()
-                url = (
-                    f"https://generativelanguage.googleapis.com/v1beta/models/"
-                    f"{model_name}:generateContent?key={urllib.parse.quote(key, safe='')}"
-                )
+                # Key goes in a header, not the URL query string, so it never
+                # ends up in a server/proxy access log or an error message
+                # that happens to echo the request URL.
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
                 payload = {
                     "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                     "generationConfig": gen_config,
@@ -571,7 +587,7 @@ class GeminiProvider:
                     data = http_post_json(
                         url=url,
                         payload=payload,
-                        headers={"Content-Type": "application/json"},
+                        headers={"Content-Type": "application/json", "x-goog-api-key": key},
                     )
                     text = extract_gemini_text(data)
                     if text:
@@ -580,13 +596,17 @@ class GeminiProvider:
                     last_error = RuntimeError("Empty response from Gemini provider")
                 except Exception as exc:
                     last_error = exc
+                    logger.warning(
+                        "%s (%s) attempt %d/%d failed: %s", self.name, candidate_model, attempt + 1, MAX_RETRIES, exc
+                    )
                     # If the model itself is unavailable, skip to the next model candidate.
                     if "HTTP 404" in str(exc) and "models/" in str(exc):
                         break
                     # Quota or auth errors can vary by model; try next model quickly.
                     if "HTTP 429" in str(exc) or "HTTP 401" in str(exc) or "HTTP 403" in str(exc):
                         break
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
+        logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
 
@@ -621,7 +641,7 @@ class MistralProvider:
         if gen_p.repetition_penalty is not None:
             payload["presence_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
             payload["frequency_penalty"] = 0.0
-        last_error = None
+        last_error: Exception | None = None
         for attempt in range(MAX_RETRIES):
             key = self._keys.next()
             try:
@@ -639,11 +659,24 @@ class MistralProvider:
                 last_error = RuntimeError("Empty response from Mistral provider")
             except Exception as exc:
                 last_error = exc
-                time.sleep(2 ** attempt)
+                logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
+                time.sleep(2**attempt)
+        logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
 
-def build_provider_stack() -> List[ChatProvider]:
+def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> List[ChatProvider]:
+    """Build the provider stack, preferring a caller's own keys per-provider.
+
+    `user_keys` (e.g. {"openai": [...], "gemini": [...], "openrouter": [...]})
+    lets a multi-tenant caller (the SaaS) run a query against a specific
+    user's own BYO provider keys instead of this process's platform keys.
+    Any provider the caller hasn't supplied a key for still falls back to the
+    platform's env-configured keys, so the ensemble stays multi-provider even
+    for a user who only connected one of their own keys. Never log the
+    contents of `user_keys`.
+    """
+    user_keys = user_keys or {}
     providers: List[ChatProvider] = []
 
     try:
@@ -651,13 +684,17 @@ def build_provider_stack() -> List[ChatProvider]:
 
         if LocalTransformerProvider().size():
             providers.append(LocalTransformerProvider())
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Local model provider unavailable: %s", exc)
 
-    openai_keys = load_keys_from_env(
-        multi_env="OPENAI_API_KEYS",
-        single_env="OPENAI_API_KEY",
-        file_env="OPENAI_API_KEYS_FILE",
+    openai_keys = (
+        user_keys.get("openai")
+        or user_keys.get("openrouter")
+        or load_keys_from_env(
+            multi_env="OPENAI_API_KEYS",
+            single_env="OPENAI_API_KEY",
+            file_env="OPENAI_API_KEYS_FILE",
+        )
     )
     if openai_keys:
         base_url = infer_openai_base_url(openai_keys)
@@ -666,7 +703,7 @@ def build_provider_stack() -> List[ChatProvider]:
             openai_model = DEFAULT_OPENROUTER_MODEL if "openrouter.ai" in base_url else DEFAULT_OPENAI_MODEL
         providers.append(OpenAIProvider(api_keys=openai_keys, model=openai_model, base_url=base_url))
 
-    gemini_keys = load_keys_from_env(
+    gemini_keys = user_keys.get("gemini") or load_keys_from_env(
         multi_env="GEMINI_API_KEYS",
         single_env="GEMINI_API_KEY",
         file_env="GEMINI_API_KEYS_FILE",
@@ -675,7 +712,7 @@ def build_provider_stack() -> List[ChatProvider]:
         gemini_model = os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
         providers.append(GeminiProvider(api_keys=gemini_keys, model=gemini_model))
 
-    mistral_keys = load_keys_from_env(
+    mistral_keys = user_keys.get("mistral") or load_keys_from_env(
         multi_env="MISTRAL_API_KEYS",
         single_env="MISTRAL_API_KEY",
         file_env="MISTRAL_API_KEYS_FILE",
@@ -683,6 +720,15 @@ def build_provider_stack() -> List[ChatProvider]:
     if mistral_keys:
         mistral_model = os.environ.get("MISTRAL_MODEL", DEFAULT_MISTRAL_MODEL).strip() or DEFAULT_MISTRAL_MODEL
         providers.append(MistralProvider(api_keys=mistral_keys, model=mistral_model))
+
+    groq_keys = user_keys.get("groq") or load_keys_from_env(
+        multi_env="GROQ_API_KEYS",
+        single_env="GROQ_API_KEY",
+        file_env="GROQ_API_KEYS_FILE",
+    )
+    if groq_keys:
+        groq_model = os.environ.get("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
+        providers.append(OpenAIProvider(api_keys=groq_keys, model=groq_model, base_url=GROQ_BASE_URL))
 
     return providers
 
@@ -701,8 +747,8 @@ def load_chat_history() -> List[Dict[str, str]]:
                 data = json.load(handle)
             if isinstance(data, list):
                 return [msg for msg in data if isinstance(msg, dict) and "role" in msg and "content" in msg]
-        except Exception:
-            print("Warning: failed to load chat history. Starting with a clean history.")
+        except Exception as exc:
+            logger.warning("Failed to load chat history, starting clean: %s", exc)
     return []
 
 
@@ -725,7 +771,7 @@ def read_source_text(path: Path) -> str:
     return normalize_whitespace(raw)
 
 
-def chunk_text(text: str, max_chars: int = 850) -> Iterable[str]:
+def chunk_text(text: str, max_chars: int = 850) -> List[str]:
     if not text:
         return []
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
@@ -933,7 +979,7 @@ def clarity_score(answer: str) -> float:
 
 
 def select_bot_configs(bot_count: int) -> List[Tuple[str, str]]:
-    configs = []
+    configs: List[Tuple[str, str]] = []
     idx = 0
     while len(configs) < bot_count:
         persona = BOT_PERSONAS[idx % len(BOT_PERSONAS)]
@@ -957,8 +1003,7 @@ def generate_candidate(
     recent_history = list(history[-MAX_HISTORY_MESSAGES:])
     if privacy_redaction:
         recent_history = [
-            {"role": item["role"], "content": redact_sensitive(item["content"])}
-            for item in recent_history
+            {"role": item["role"], "content": redact_sensitive(item["content"])} for item in recent_history
         ]
 
     system_prompt = (
@@ -987,6 +1032,80 @@ def generate_candidate(
     return provider.chat(messages=messages, temperature=gen_p.temperature, gen_p=gen_p)
 
 
+def maybe_refine_prompt(user_input: str) -> str:
+    """Best-effort "AI helping the prompt" pre-processing step.
+
+    Runs the trained prompt-refiner TinyGPT (see train/prompt_refiner_data.py)
+    on the raw user prompt before it reaches retrieval or the bot personas.
+    Returns the input unchanged whenever the trained model isn't available or
+    refinement fails -- this must never block a query.
+    """
+    try:
+        from local_models import refine_prompt
+
+        refined = refine_prompt(user_input)
+        return refined or user_input
+    except Exception:
+        return user_input
+
+
+def run_deep_review(
+    answer: str,
+    sources: Sequence[SourceChunk],
+    providers: Sequence[ChatProvider],
+    exclude_provider: "ChatProvider | None" = None,
+    privacy_redaction: bool = True,
+) -> float | None:
+    """Optional second-pass verification: ask one more provider to rate
+    confidence in the answer that already won synthesis.
+
+    Deliberately a single extra call, not another full ensemble round --
+    "Deep Review" cross-checks the answer, it doesn't re-run the pipeline.
+    Falls back to the same heuristic scores used elsewhere in this file when
+    the LLM doesn't return a clean number, and returns None (not 0.0) when no
+    provider is available at all, so callers can tell "unavailable" apart
+    from "scored zero".
+    """
+    if not providers:
+        return None
+
+    reviewer = next((p for p in providers if p is not exclude_provider), providers[0])
+
+    source_context = format_sources_for_prompt(sources)
+    safe_answer = redact_sensitive(answer) if privacy_redaction else answer
+    prompt = (
+        "You are a strict fact-checker. Rate your confidence, from 0 to 100, "
+        "that the ANSWER below is accurate, well-supported by the SOURCES, and "
+        "free of one-sided bias. Respond with ONLY the number, nothing else.\n\n"
+        f"SOURCES:\n{source_context}\n\n"
+        f"ANSWER:\n{safe_answer}\n\n"
+        "Confidence (0-100):"
+    )
+    messages = [
+        {"role": "system", "content": "Respond with a single integer 0-100 and nothing else."},
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        reply = reviewer.chat(
+            messages=messages,
+            temperature=0.0,
+            gen_p=GenerationConfig(temperature=0.0, max_tokens=10),
+        )
+        match = re.search(r"\d{1,3}", reply)
+        if match:
+            score = max(0, min(100, int(match.group())))
+            return round(score / 100, 3)
+    except Exception as exc:
+        logger.warning("Deep review call failed, falling back to heuristic confidence: %s", exc)
+
+    # Fallback: heuristic re-score of the final answer, no extra call needed.
+    return round(
+        0.50 * source_support_score(answer, sources) + 0.25 * bias_score(answer) + 0.25 * clarity_score(answer),
+        3,
+    )
+
+
 def build_ensemble_answer(
     providers: Sequence[ChatProvider],
     history: Sequence[Dict[str, str]],
@@ -995,7 +1114,17 @@ def build_ensemble_answer(
     bot_count: int,
     privacy_redaction: bool,
     gen_p: "GenerationConfig" = GenerationConfig(),
-) -> Tuple[str, List[Candidate]]:
+    deep_review: bool = False,
+) -> Tuple[str, List[Candidate], Dict[str, float], "float | None"]:
+    from token_optimizer import optimize_context
+
+    # Trim once per query, reused by every parallel bot call below -- the
+    # real saving is this trimmed context times bot_count, not just once.
+    optimized = optimize_context(sources, history)
+    sources = optimized.sources
+    history = optimized.history
+    token_savings = optimized.savings.as_dict()
+
     source_context = format_sources_for_prompt(sources)
     bot_configs = select_bot_configs(bot_count)
     if not providers:
@@ -1031,9 +1160,7 @@ def build_ensemble_answer(
                 try:
                     from local_models import blend_score
 
-                    s_score, b_score, c_score = blend_score(
-                        text, sources, s_score, b_score, c_score
-                    )
+                    s_score, b_score, c_score = blend_score(text, sources, s_score, b_score, c_score)
                 except Exception:
                     pass
                 total = (0.50 * s_score) + (0.25 * b_score) + (0.25 * c_score)
@@ -1100,7 +1227,19 @@ def build_ensemble_answer(
     if detect_sensitive_hits(final_answer):
         final_answer = redact_sensitive(final_answer)
 
-    return final_answer.strip(), successful
+    final_answer = final_answer.strip()
+
+    confidence_score: float | None = None
+    if deep_review:
+        confidence_score = run_deep_review(
+            answer=final_answer,
+            sources=sources,
+            providers=providers,
+            exclude_provider=synthesis_provider,
+            privacy_redaction=privacy_redaction,
+        )
+
+    return final_answer, successful, token_savings, confidence_score
 
 
 def print_help() -> None:
@@ -1174,6 +1313,11 @@ def handle_command(
 
 
 def main() -> None:
+    # Only the interactive CLI configures a real handler -- as a library
+    # (e.g. imported by the FastAPI query-ensemble function) this module
+    # stays silent by default via the NullHandler set up above.
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+
     providers = build_provider_stack()
     if not providers:
         print("No provider API keys found.")
@@ -1181,6 +1325,7 @@ def main() -> None:
         print("  export OPENAI_API_KEYS='k1,k2' or OPENAI_API_KEY='k1'")
         print("  export GEMINI_API_KEYS='k1,k2' or GEMINI_API_KEY='k1'")
         print("  export MISTRAL_API_KEYS='k1,k2' or MISTRAL_API_KEY='k1'")
+        print("  export GROQ_API_KEYS='k1,k2' or GROQ_API_KEY='k1'")
         return
 
     requested_bots = parse_int_env("BOT_COUNT", default=4, minimum=2, maximum=MAX_PARALLEL_BOTS)
@@ -1219,17 +1364,18 @@ def main() -> None:
             if runtime_flags["privacy_redaction"]:
                 redaction_hits = detect_sensitive_hits(user_input)
                 if redaction_hits:
-                    print(
-                        "Privacy warning: sensitive patterns detected in your prompt -> "
-                        + ", ".join(redaction_hits)
-                    )
+                    print("Privacy warning: sensitive patterns detected in your prompt -> " + ", ".join(redaction_hits))
                     print("The prompt will be redacted before it is sent to remote APIs.")
 
-            retrieved_sources = source_index.retrieve(user_input, top_k=TOP_K_SOURCES)
-            answer, candidates = build_ensemble_answer(
+            refined_input = maybe_refine_prompt(user_input)
+            if refined_input != user_input:
+                print(f"(refined prompt: {refined_input})")
+
+            retrieved_sources = source_index.retrieve(refined_input, top_k=TOP_K_SOURCES)
+            answer, candidates, token_savings, confidence_score = build_ensemble_answer(
                 providers=providers,
                 history=chat_history,
-                user_input=user_input,
+                user_input=refined_input,
                 sources=retrieved_sources,
                 bot_count=bot_count,
                 privacy_redaction=runtime_flags["privacy_redaction"],
@@ -1237,6 +1383,11 @@ def main() -> None:
 
             print("\nAI:")
             print(answer)
+            if token_savings["tokens_saved"] > 0:
+                print(
+                    f"(context optimizer: ~{token_savings['tokens_saved']} tokens saved "
+                    f"per bot call, {token_savings['tokens_saved_pct']}%)"
+                )
             print("\nSource checks:")
             print(format_sources_for_user(retrieved_sources))
             print("\nResponse checks:")

@@ -11,7 +11,7 @@ import DashboardHeader from "@/components/layout/dashboard-header";
 interface TrainingJob {
   id: string;
   name: string;
-  status: "pending" | "training" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "failed";
   progress: number;
   baseModel: string;
   epochs: number;
@@ -39,7 +39,6 @@ export default function TrainingPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newJobName, setNewJobName] = useState("");
   const [newJobBaseModel, setNewJobBaseModel] = useState("scratch-tinygpt");
   const [newJobEpochs, setNewJobEpochs] = useState(3);
   const [newJobLearningRate, setNewJobLearningRate] = useState(0.0002);
@@ -55,7 +54,7 @@ export default function TrainingPage() {
   );
 
   const createJob = useMutation(
-    async (job: { name: string; baseModel: string; epochs: number; learningRate: number }) => {
+    async (job: { kind: "generator" | "scorer" | "both"; epochs: number; learning_rate: number }) => {
       const res = await fetch("/api/training", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +67,6 @@ export default function TrainingPage() {
       onSuccess: () => {
         queryClient.invalidateQueries(["training"]);
         setShowCreateModal(false);
-        setNewJobName("");
         setNewJobBaseModel("scratch-tinygpt");
         setNewJobEpochs(3);
         setNewJobLearningRate(0.0002);
@@ -76,32 +74,32 @@ export default function TrainingPage() {
     },
   );
 
-  const mockTrainingJobs = training?.jobs ?? [];
+  const trainingJobs = training?.jobs ?? [];
   const registryModels = training?.models ?? [];
   const corpus = training?.corpus ?? { docs: 0, chars: 0 };
 
+  // Only the from-scratch TinyGPT pipeline (train/train.py) actually exists --
+  // there's no fine-tuning path for an external model like Gemma or Mistral
+  // anywhere in this codebase, so those aren't offered as options here.
   const baseModels = [
-    { id: "scratch-tinygpt", name: "TinyGPT (scratch)", params: "0.5M", company: "MultiLLM" },
-    { id: "ensemble-generator", name: "Ensemble Generator", params: "0.5M", company: "MultiLLM" },
-    { id: "ensemble-scorer", name: "Answer Scorer", params: "0.3M", company: "MultiLLM" },
-    { id: "gemma-2b", name: "Gemma 2B", params: "2B", company: "Google" },
-    { id: "mistral-7b", name: "Mistral 7B", params: "7B", company: "Mistral AI" },
+    { id: "scratch-tinygpt", name: "TinyGPT (scratch, both models)", params: "0.8M", company: "MultiLLM", kind: "both" as const },
+    { id: "ensemble-generator", name: "Ensemble Generator only", params: "0.5M", company: "MultiLLM", kind: "generator" as const },
+    { id: "ensemble-scorer", name: "Answer Scorer only", params: "0.3M", company: "MultiLLM", kind: "scorer" as const },
   ];
 
   const handleCreateJob = () => {
-    if (!newJobName.trim()) return;
+    const kind = baseModels.find((m) => m.id === newJobBaseModel)?.kind || "both";
     createJob.mutate({
-      name: newJobName,
-      baseModel: newJobBaseModel,
+      kind,
       epochs: newJobEpochs,
-      learningRate: newJobLearningRate,
+      learning_rate: newJobLearningRate,
     });
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending": return "bg-slate-100 text-slate-700";
-      case "training": return "bg-blue-100 text-blue-700";
+      case "running": return "bg-blue-100 text-blue-700";
       case "completed": return "bg-emerald-100 text-emerald-700";
       case "failed": return "bg-red-100 text-red-700";
       default: return "bg-slate-100 text-slate-700";
@@ -139,7 +137,7 @@ export default function TrainingPage() {
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors flex items-center gap-2"
-              disabled={user?.prefs?.subscriptionTier === "free"}
+              disabled={user?.profile?.plan === "free"}
             >
               <Play className="w-5 h-5" />
               Start New Training
@@ -154,7 +152,7 @@ export default function TrainingPage() {
             className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
           >
             {[
-              { icon: Cloud, title: "Cloud Training", desc: "Leverage GPU resources in the cloud for faster training", available: user?.prefs?.subscriptionTier !== "free" },
+              { icon: Cloud, title: "Cloud Training", desc: "Leverage GPU resources in the cloud for faster training", available: user?.profile?.plan !== "free" },
               { icon: HardDrive, title: "Local Training", desc: "Train models on your own hardware", available: true },
               { icon: Database, title: "Model Registry", desc: "Store, version, and manage your custom models", available: true },
             ].map((feature, index) => (
@@ -243,7 +241,7 @@ export default function TrainingPage() {
               <h2 className="text-xl font-semibold text-slate-900">Your Training Jobs</h2>
             </div>
 
-            {mockTrainingJobs.length === 0 ? (
+            {trainingJobs.length === 0 ? (
               <div className="p-12 text-center">
                 <Cpu className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-slate-900 mb-2">No training jobs yet</h3>
@@ -258,7 +256,7 @@ export default function TrainingPage() {
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {mockTrainingJobs.map((job) => (
+                {trainingJobs.map((job) => (
                   <motion.div
                     key={job.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -268,8 +266,8 @@ export default function TrainingPage() {
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl ${job.status === "training" ? "bg-blue-100" : job.status === "completed" ? "bg-emerald-100" : "bg-slate-100"}`}>
-                          <Cpu className={`w-6 h-6 ${job.status === "training" ? "text-blue-600" : job.status === "completed" ? "text-emerald-600" : "text-slate-600"}`} />
+                        <div className={`p-3 rounded-xl ${job.status === "running" ? "bg-blue-100" : job.status === "completed" ? "bg-emerald-100" : "bg-slate-100"}`}>
+                          <Cpu className={`w-6 h-6 ${job.status === "running" ? "text-blue-600" : job.status === "completed" ? "text-emerald-600" : "text-slate-600"}`} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -302,7 +300,7 @@ export default function TrainingPage() {
                       <div>
                         <div className="text-slate-500">Duration</div>
                         <div className="font-medium text-slate-900">
-                          {job.status === "pending" ? "Upcoming" : job.status === "training" ? "In Progress" : formatDuration(job.createdAt, job.completedAt)}
+                          {job.status === "pending" ? "Upcoming" : job.status === "running" ? "In Progress" : formatDuration(job.createdAt, job.completedAt)}
                         </div>
                       </div>
                       <div>
@@ -327,7 +325,7 @@ export default function TrainingPage() {
                       </div>
                     )}
 
-                    {job.status === "training" && (
+                    {job.status === "running" && (
                       <div className="mt-4 pt-4 border-t border-slate-100">
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                           <div className="text-sm text-blue-800">
@@ -394,20 +392,6 @@ export default function TrainingPage() {
               <h2 className="text-2xl font-bold text-slate-900 mb-6">Start New Training Job</h2>
 
               <div className="space-y-6">
-                <div>
-                  <label htmlFor="jobName" className="block text-sm font-medium text-slate-700 mb-1">
-                    Job Name
-                  </label>
-                  <input
-                    id="jobName"
-                    type="text"
-                    value={newJobName}
-                    onChange={(e) => setNewJobName(e.target.value)}
-                    placeholder="e.g., TinyGPT from scratch, Retrain on corpus"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
-                  />
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="baseModel" className="block text-sm font-medium text-slate-700 mb-1">
@@ -462,23 +446,15 @@ export default function TrainingPage() {
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <div className="text-slate-500">Est. Time</div>
-                      <div className="font-medium text-slate-900">
-                        {newJobBaseModel.startsWith("scratch") || newJobBaseModel.startsWith("ensemble")
-                          ? newJobEpochs <= 10 ? "20 seconds" : "~1 minute"
-                          : newJobEpochs === 1 ? "5-10 minutes" : newJobEpochs <= 5 ? "30-60 minutes" : newJobEpochs <= 10 ? "2-3 hours" : "6-12 hours"}
-                      </div>
+                      <div className="font-medium text-slate-900">{newJobEpochs <= 10 ? "20 seconds" : "~1 minute"}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500">GPU Memory</div>
-                      <div className="font-medium text-slate-900">
-                        {newJobBaseModel.startsWith("scratch") || newJobBaseModel.startsWith("ensemble") ? "MPS/CPU" : newJobBaseModel.includes("7b") ? "8GB+" : "4GB+"}
-                      </div>
+                      <div className="text-slate-500">Compute</div>
+                      <div className="font-medium text-slate-900">CPU</div>
                     </div>
                     <div>
                       <div className="text-slate-500">Cost</div>
-                      <div className="font-medium text-slate-900">
-                        {newJobBaseModel.startsWith("scratch") || newJobBaseModel.startsWith("ensemble") ? "Free (local)" : newJobEpochs === 1 ? "~$0.10" : newJobEpochs <= 5 ? "~$1.00" : newJobEpochs <= 10 ? "~$5.00" : "~$25.00"}
-                      </div>
+                      <div className="font-medium text-slate-900">Free (local)</div>
                     </div>
                   </div>
                 </div>

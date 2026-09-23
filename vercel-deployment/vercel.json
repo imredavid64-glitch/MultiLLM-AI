@@ -1,3 +1,33 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "functions/query-ensemble/main.py": {
+      "runtime": "python3.11",
+      "maxDuration": 60
+    },
+    "functions/training-job/main.py": {
+      "runtime": "python3.11", 
+      "maxDuration": 3600
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-key",
+    "STRIPE_SECRET_KEY": "@stripe-secret-key",
+    "STRIPE_WEBHOOK_SECRET": "@stripe-webhook-secret",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "@stripe-publishable-key",
+    "STRIPE_PRICE_PRO": "@stripe-price-pro",
+    "STRIPE_PRICE_ENTERPRISE": "@stripe-price-enterprise",
+    "ENCRYPTION_KEY": "@encryption-key",
+    "OPENAI_API_KEY": "@openai-api-key",
+    "GEMINI_API_KEY": "@gemini-api-key",
+    "MISTRAL_API_KEY": "@mistral-api-key",
+    "GROQ_API_KEY": "@groq-api-key",
+    "PYTHON_ENSEMBLE_URL": "@python-ensemble-url",
+    "PYTHON_TRAINING_URL": "@python-training-url",
+    "INTERNAL_API_SECRET": "@internal-api-secret",
+    "APP_ORIGIN": "@app-origin",
+    "QUERY_RATE_LIMIT_PER_MINUTE": "1000"
+  }
 }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence
 
 import streamlit as st
 
@@ -9,9 +9,9 @@ from ai_client import (
     SOURCES_DIR,
     Candidate,
     ChatProvider,
-    SourceChunk,
     SourceIndex,
     bias_score,
+    build_ensemble_answer,
     build_provider_stack,
     detect_sensitive_hits,
     format_provider_status,
@@ -60,8 +60,8 @@ def run_one(prompt: str, bot_count: int, privacy: bool, gen_cfg: "GenerationConf
     }
     try:
         start = time.perf_counter()
-        sources = st.session_state.test_index.retrieve(prompt)
-        answer, candidates = build_ensemble_answer(
+        sources = []  # Disable RAG - use direct AI response
+        answer, candidates, token_savings, confidence_score = build_ensemble_answer(
             providers=st.session_state.test_providers,
             history=[],
             user_input=prompt,
@@ -72,8 +72,7 @@ def run_one(prompt: str, bot_count: int, privacy: bool, gen_cfg: "GenerationConf
         )
         elapsed = time.perf_counter() - start
         top = (
-            f"{candidates[0].bot_name} via {candidates[0].provider_name} "
-            f"({candidates[0].total_score:.3f})"
+            f"{candidates[0].bot_name} via {candidates[0].provider_name} " f"({candidates[0].total_score:.3f})"
             if candidates
             else "n/a"
         )
@@ -113,9 +112,7 @@ def render_generation_settings() -> "GenerationConfig":
     max_tokens = st.sidebar.slider("Max tokens", 64, 4096, 1024, 64, key="gs_max_tokens")
     enable_rep = st.sidebar.toggle("Enable repetition penalty", value=False, key="gs_enable_rep")
     rep_pen = (
-        st.sidebar.slider("Repetition penalty (1.0 = none)", 1.0, 2.0, 1.15, 0.05, key="gs_rep")
-        if enable_rep
-        else None
+        st.sidebar.slider("Repetition penalty (1.0 = none)", 1.0, 2.0, 1.15, 0.05, key="gs_rep") if enable_rep else None
     )
     return GenerationConfig(
         temperature=temperature,
@@ -150,7 +147,9 @@ def render_provider_header(providers: Sequence[ChatProvider]) -> None:
     st.markdown(f"### Providers ({len(providers)})")
     st.code(format_provider_status(providers) or "(none configured)", language="text")
     if not providers:
-        st.error("No providers configured. Set OPENAI_API_KEYS / GEMINI_API_KEYS / MISTRAL_API_KEYS in the environment before running.")
+        st.error(
+            "No providers configured. Set OPENAI_API_KEYS / GEMINI_API_KEYS / MISTRAL_API_KEYS in the environment before running."
+        )
 
 
 def render_candidate_list(candidates: Sequence[Candidate]) -> None:
@@ -189,7 +188,8 @@ def render_result(result: Dict, show_raw: bool) -> None:
         st.error(f"Error: {result['error']}")
         return
     st.write("**Answer**")
-    st.write(result["answer"])
+    with st.expander("Show full answer", expanded=True):
+        st.text_area("Full response", result["answer"], height=300)
     c = st.columns(4)
     c[0].metric("source", f"{result['source_score']:.3f}")
     c[1].metric("bias", f"{result['bias_score']:.3f}")
