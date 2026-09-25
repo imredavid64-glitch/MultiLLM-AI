@@ -32,7 +32,13 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       if (isRegister) {
-        await register(email, password, name);
+        const { needsEmailConfirmation } = await register(email, password, name);
+        if (needsEmailConfirmation) {
+          toast.success("Account created! Check your email to confirm before signing in.", { duration: 6000 });
+          setIsRegister(false);
+          setPassword("");
+          return;
+        }
         toast.success("Account created! Welcome to MultiLLM.");
       } else {
         await login(email, password);

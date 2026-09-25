@@ -21,7 +21,7 @@ interface AuthContextType {
   loading: boolean;
   demoMode: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<{ needsEmailConfirmation: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -174,11 +174,18 @@ if (session?.user) {
       const u = demoUser(email, name || email.split("@")[0]);
       window.localStorage.setItem(DEMO_USER_KEY, JSON.stringify(u));
       setUser(u);
-      return;
+      return { needsEmailConfirmation: false };
     }
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
     if (error) throw error;
+    // Supabase returns a user but no session when email confirmation is
+    // required (the project default) -- there's nothing to log in with yet,
+    // so callers must not treat this the same as an immediate sign-in.
+    if (!data.session) {
+      return { needsEmailConfirmation: true };
+    }
     await fetchUser();
+    return { needsEmailConfirmation: false };
   };
 
   const logout = async () => {
