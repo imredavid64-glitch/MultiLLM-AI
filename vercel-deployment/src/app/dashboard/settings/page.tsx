@@ -203,6 +203,7 @@ export default function SettingsPage() {
                       {avatarOptions.map((avatar) => (
                         <button
                           key={avatar.id}
+                          type="button"
                           onClick={() => handleAvatarSelect(avatar.name)}
                           className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-semibold transition-all ${avatar.color} ${avatar.name === selectedAvatar ? "ring-2 ring-purple-600 ring-offset-2" : "hover:scale-110"}`}
                         >
