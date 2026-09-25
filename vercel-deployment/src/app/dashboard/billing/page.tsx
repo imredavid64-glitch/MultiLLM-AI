@@ -15,6 +15,14 @@ const SUBSCRIPTION_TIERS: Array<{ id: "free" | "pro" | "enterprise"; name: strin
   { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
 ];
 
+// Billing is handled manually (contact/invoice), not via Stripe self-serve
+// checkout -- set this to a real inbox before launch.
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sales@example.com";
+const contactMailto = (tierName: string) =>
+  `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`MultiLLM ${tierName} plan`)}&body=${encodeURIComponent(
+    `Hi, I'd like to upgrade to the ${tierName} plan.`
+  )}`;
+
 interface SubscriptionRow {
   plan: "free" | "pro" | "enterprise";
   status: "active" | "canceled" | "past_due" | "trialing";
@@ -59,34 +67,16 @@ export default function BillingPage() {
     }
   };
 
-  const handleUpgrade = async (tierId: "free" | "pro" | "enterprise") => {
-    if (!userId) return;
-    if (demoMode) {
-      toast.error("Billing requires a real account (demo mode has no payment backend).");
-      return;
-    }
-    // There's no direct "downgrade to free" endpoint -- cancelling in the
-    // Stripe billing portal is what actually drops a subscriber back to
-    // free (the webhook handles the plan change from there), so route
-    // there instead of silently doing nothing.
+  // Self-serve Stripe Checkout is intentionally not used -- upgrades go
+  // through manual contact/billing instead. The /api/checkout route stays
+  // in place but unused; this just stops routing users into it.
+  const handleUpgrade = (tierId: "free" | "pro" | "enterprise") => {
     if (tierId === "free") {
-      await handleManageBilling();
+      handleManageBilling();
       return;
     }
-    setActionPending(tierId);
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: tierId }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "Checkout failed");
-      window.location.href = data.url;
-    } catch (err: any) {
-      toast.error(err.message || "Could not start checkout");
-      setActionPending(null);
-    }
+    const tierName = SUBSCRIPTION_TIERS.find((t) => t.id === tierId)?.name || tierId;
+    window.location.href = contactMailto(tierName);
   };
 
   const handleManageBilling = async () => {
@@ -279,7 +269,7 @@ export default function BillingPage() {
                           disabled={actionPending === tier.id}
                           className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
                         >
-                          {actionPending === tier.id ? "Redirecting..." : tier.price === 0 ? "Downgrade" : "Upgrade"}
+                          {tier.price === 0 ? "Downgrade" : "Contact Sales"}
                         </button>
                       )}
                     </motion.div>

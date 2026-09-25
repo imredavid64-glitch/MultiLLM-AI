@@ -26,6 +26,12 @@ export const RATE_LIMITS: Record<Tier, number> = {
   enterprise: 1000,
 };
 
+// Anonymous callers (no session, no API key -- e.g. the homepage's public
+// try-it demo) get a tighter per-IP cap than a signed-up free account,
+// since they have no profile/credits gate at all and burn the platform's
+// own provider keys on every request.
+const ANONYMOUS_RATE_LIMIT = 3;
+
 export interface RateLimitResult {
   allowed: boolean;
   retryAfterSeconds: number;
@@ -107,7 +113,7 @@ async function checkBucket(namespace: "ip" | "identity", key: string, limit: num
  */
 export async function checkRateLimit(opts: { ip: string; identityKey?: string; tier: Tier }): Promise<RateLimitResult> {
   if (!opts.identityKey) {
-    return checkBucket("ip", opts.ip, RATE_LIMITS.free);
+    return checkBucket("ip", opts.ip, ANONYMOUS_RATE_LIMIT);
   }
   const ipResult = await checkBucket("ip", opts.ip, RATE_LIMITS.enterprise);
   if (!ipResult.allowed) return ipResult;

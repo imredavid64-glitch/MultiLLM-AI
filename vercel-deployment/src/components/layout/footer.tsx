@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sales@example.com";
+
 export default function Footer() {
   return (
     <footer className="bg-slate-900 text-slate-400">
@@ -13,6 +15,8 @@ export default function Footer() {
           </div>
           <div className="text-sm flex flex-col md:items-end gap-2">
             <div className="flex gap-4">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-white transition-colors">Contact</a>
+              <Link href="/test-results" className="hover:text-white transition-colors">Test Results</Link>
               <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
               <Link href="/dpa" className="hover:text-white transition-colors">DPA</Link>
