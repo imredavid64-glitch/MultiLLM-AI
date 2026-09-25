@@ -12,7 +12,7 @@ const isConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEX
 export async function getAuthenticatedUserId(): Promise<string | null> {
   if (!isConfigured) return null;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

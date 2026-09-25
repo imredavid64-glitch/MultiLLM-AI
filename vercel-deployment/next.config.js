@@ -1,16 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Turbopack (default since Next 16) walks up for the nearest lockfile to
+  // infer the workspace root, and picks up an unrelated package-lock.json
+  // higher up this machine's directory tree outside the git repo -- pin it
+  // explicitly instead.
+  turbopack: {
+    root: __dirname,
+  },
   // /terms, /privacy, and /dpa read their content from legal/*.md via a
   // parameterized fs.readFileSync call, which Next's build-time file tracer
   // can't always detect through static analysis alone -- force-include the
   // directory so it isn't silently dropped from the deployed function.
-  experimental: {
-    outputFileTracingIncludes: {
-      "/terms": ["./legal/**"],
-      "/privacy": ["./legal/**"],
-      "/dpa": ["./legal/**"],
-    },
+  // (Next 16: this moved out of `experimental` to a top-level key.)
+  outputFileTracingIncludes: {
+    "/terms": ["./legal/**"],
+    "/privacy": ["./legal/**"],
+    "/dpa": ["./legal/**"],
   },
   async headers() {
     return [

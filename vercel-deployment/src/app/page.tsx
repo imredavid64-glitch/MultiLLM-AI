@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain, CheckCircle2 } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -71,7 +71,7 @@ export default function HomePage() {
       toast.success("Ensemble complete!", { id: toastId });
       setResult(answer);
       
-      queryClient.invalidateQueries(['user-stats']);
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       
     } catch (error) {
       toast.error(`Query failed: ${(error as Error).message}`, { id: toastId });

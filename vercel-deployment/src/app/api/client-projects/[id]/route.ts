@@ -5,7 +5,8 @@ import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

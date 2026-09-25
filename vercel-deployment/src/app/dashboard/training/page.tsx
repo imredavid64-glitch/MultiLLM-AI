@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Cloud, Cpu, Database, HardDrive, Layers, Play, Upload, Trash2, Download } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -43,18 +43,18 @@ export default function TrainingPage() {
   const [newJobEpochs, setNewJobEpochs] = useState(3);
   const [newJobLearningRate, setNewJobLearningRate] = useState(0.0002);
 
-  const { data: training, isLoading } = useQuery<TrainingData>(
-    ["training"],
-    async () => {
+  const { data: training, isLoading } = useQuery<TrainingData>({
+    queryKey: ["training"],
+    queryFn: async () => {
       const res = await fetch("/api/training");
       if (!res.ok) throw new Error("Failed to load training data");
       return res.json();
     },
-    { refetchInterval: 3000 },
-  );
+    refetchInterval: 3000,
+  });
 
-  const createJob = useMutation(
-    async (job: { kind: "generator" | "scorer" | "both"; epochs: number; learning_rate: number }) => {
+  const createJob = useMutation({
+    mutationFn: async (job: { kind: "generator" | "scorer" | "both"; epochs: number; learning_rate: number }) => {
       const res = await fetch("/api/training", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,16 +63,14 @@ export default function TrainingPage() {
       if (!res.ok) throw new Error("Failed to create job");
       return res.json();
     },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(["training"]);
-        setShowCreateModal(false);
-        setNewJobBaseModel("scratch-tinygpt");
-        setNewJobEpochs(3);
-        setNewJobLearningRate(0.0002);
-      },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["training"] });
+      setShowCreateModal(false);
+      setNewJobBaseModel("scratch-tinygpt");
+      setNewJobEpochs(3);
+      setNewJobLearningRate(0.0002);
     },
-  );
+  });
 
   const trainingJobs = training?.jobs ?? [];
   const registryModels = training?.models ?? [];
