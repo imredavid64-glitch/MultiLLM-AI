@@ -8,9 +8,28 @@ import Footer from "@/components/layout/footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const BASE_URL = "https://multillm-three.vercel.app";
+const DESCRIPTION = "One prompt. Multiple LLMs. The best answer, automatically selected.";
+
 export const metadata = {
-  title: "MultiLLM - Ensemble AI Platform",
-  description: "One prompt. Multiple LLMs. The best answer, automatically selected.",
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: "MultiLLM - Ensemble AI Platform",
+    template: "%s — MultiLLM",
+  },
+  description: DESCRIPTION,
+  openGraph: {
+    title: "MultiLLM - Ensemble AI Platform",
+    description: DESCRIPTION,
+    url: BASE_URL,
+    siteName: "MultiLLM",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MultiLLM - Ensemble AI Platform",
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
