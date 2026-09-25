@@ -25,6 +25,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -211,8 +213,28 @@ if (session?.user) {
     await fetchUser();
   };
 
+  const requestPasswordReset = async (email: string) => {
+    if (demoMode) {
+      throw new Error("Password reset isn't available in demo mode (no email backend configured).");
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    if (demoMode) {
+      throw new Error("Password reset isn't available in demo mode (no email backend configured).");
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, demoMode, login, register, logout, refreshUser, updateProfile }}>
+    <AuthContext.Provider
+      value={{ user, loading, demoMode, login, register, logout, refreshUser, updateProfile, requestPasswordReset, updatePassword }}
+    >
       {children}
     </AuthContext.Provider>
   );
