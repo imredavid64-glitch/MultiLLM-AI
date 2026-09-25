@@ -8,9 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:generate-types": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/supabase.ts",
-    "docs:download": "node scripts/download-docs.js",
-    "docs:generate": "node scripts/generate-docs.js"
+    "db:generate-types": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/supabase.ts"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.8.7",

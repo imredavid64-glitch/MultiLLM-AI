@@ -1,3 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multillm-ensemble"
+version = "0.1.0"
+description = "Multi-LLM ensemble: parallel model answers, scored and synthesized into one cited result."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai",
+    "httpx",
+    "torch",
+    "numpy",
+]
+
+[project.scripts]
+multillm = "ensemble_demo:main"
+
+[tool.setuptools]
+py-modules = ["ai_client", "ensemble_demo", "local_models", "token_optimizer"]
+packages = ["train"]
+
 [tool.ruff]
 line-length = 120
 # Directory patterns only (not substrings) -- "models" here must not match

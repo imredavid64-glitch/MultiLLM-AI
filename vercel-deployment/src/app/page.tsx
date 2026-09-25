@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain } from "lucide-react";
+import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain, CheckCircle2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { SustainabilityMetrics } from "@/types/multi-llm";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -89,21 +89,26 @@ export default function HomePage() {
   return (
     <div className="space-y-12">
       {/* Hero Section - Multi-LLM Focus */}
-      <section className="text-center py-16">
+      <section className="relative text-center py-16 overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 -top-24 h-80 bg-[radial-gradient(ellipse_at_top,_theme(colors.purple.200),_transparent_65%)]"
+        />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          className="relative"
         >
-          <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-4">
-            MultiLLM
+          <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-slate-900 mb-4">
+            Multi<span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">LLM</span>
           </h1>
           <p className="text-xl text-slate-600 max-w-3xl mx-auto mb-8">
-            One prompt. <span className="font-semibold text-purple-600">Multiple LLMs.</span> 
+            One prompt. <span className="font-semibold text-purple-600">Multiple LLMs.</span>
             The best answer, automatically selected.
           </p>
-          
-          <div className="flex flex-wrap justify-center gap-4 mb-12">
+
+          <div className="flex flex-wrap justify-center gap-4 mb-8">
             {[
               { icon: Brain, label: "Ensemble Scoring", color: "text-purple-600" },
               { icon: Target, label: "Best Answer Selection", color: "text-blue-600" },
@@ -114,7 +119,7 @@ export default function HomePage() {
               return (
                 <div
                   key={index}
-                  className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm"
+                  className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm ring-1 ring-slate-100"
                 >
                   <Icon className={`w-5 h-5 ${feature.color}`} />
                   <span className="text-sm font-medium text-slate-700">{feature.label}</span>
@@ -122,14 +127,22 @@ export default function HomePage() {
               );
             })}
           </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mb-12 text-sm text-slate-400">
+            <span className="uppercase tracking-wide text-xs text-slate-400">Ensembles across</span>
+            {["OpenAI", "Gemini", "Mistral", "Groq"].map((provider) => (
+              <span key={provider} className="font-medium text-slate-500">{provider}</span>
+            ))}
+          </div>
         </motion.div>
 
         {/* Query Input */}
         <motion.div
+          id="try-it"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="max-w-2xl mx-auto"
+          className="relative max-w-2xl mx-auto scroll-mt-24"
         >
           <form onSubmit={handleSubmit} className="flex gap-3">
             <input
@@ -351,16 +364,40 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Test Results teaser */}
+      <section className="py-16">
+        <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-2xl font-bold text-slate-900">Tested, honestly</h2>
+          </div>
+          <p className="text-slate-600 max-w-xl mx-auto mb-6">
+            45/45 unit tests passing, and a from-scratch-trained scoring model with 0.006 avg. error — plus the
+            parts that didn&apos;t come out great, unedited.
+          </p>
+          <a href="/test-results" className="text-purple-600 font-semibold hover:text-purple-700 inline-flex items-center gap-1">
+            See the real numbers <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="text-center py-16 bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl">
         <h2 className="text-3xl font-bold text-slate-900 mb-4">Stop Guessing. Start Ensembling.</h2>
         <p className="text-slate-600 mb-8 max-w-2xl mx-auto">
           Get better answers by running every prompt across multiple LLMs and automatically selecting the best one.
         </p>
-        <button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-semibold transition-colors flex items-center gap-2 mx-auto">
+        <a
+          href="#try-it"
+          className="inline-flex bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-semibold transition-colors items-center gap-2 mx-auto"
+        >
           Try MultiLLM Free
           <ArrowRight className="w-5 h-5" />
-        </button>
+        </a>
+        <p className="text-sm text-slate-500 mt-4">
+          Free to try, no account needed. Looking at Pro or Enterprise?{" "}
+          <a href="/dashboard/billing" className="text-purple-600 underline">Talk to us</a>.
+        </p>
       </section>
     </div>
   );
