@@ -163,7 +163,13 @@ jobs:
       - name: Run pip-audit
         run: |
           pip install pip-audit
-          pip-audit
+          # Scoped to our own requirements.txt -- a bare `pip-audit` audits
+          # every package in the environment, which on this runner image
+          # includes Ubuntu's own system/cloud-init tooling (cloud-init,
+          # ubuntu-pro-client, walinuxagent, bcc, ...). Those aren't this
+          # project's dependencies and aren't ours to patch; scoping avoids
+          # failing the build on vulnerabilities we have no way to fix.
+          pip-audit -r requirements.txt
 
   # Reject commits containing real secrets or unresolved config placeholders
   secret-scan:
