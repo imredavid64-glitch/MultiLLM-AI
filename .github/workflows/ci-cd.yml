@@ -2,13 +2,13 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 env:
   NODE_VERSION: '20.x'
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.12'
 
 jobs:
   # Python tests and linting
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./vercel-deployment/functions/query-ensemble
+        working-directory: ./vercel-deployment/api/query-ensemble
     steps:
       - uses: actions/checkout@v4
       
@@ -119,59 +119,26 @@ jobs:
           curl -f http://localhost:8000/api/health
           kill %1
 
-  # Training function tests
-  training-function-test:
-    name: Training Function Test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./vercel-deployment/functions/training-job
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: Install dependencies
-        run: |
-          pip install -U pip
-          pip install -r requirements.txt
-          pip install pytest httpx
-      
-      - name: Test function imports
-        run: |
-          python -c "from main import app; print('Import OK')"
+  # Training function tests: skipped. training-job is excluded from
+  # deployment (vercel-deployment/training-job-disabled/, not under api/ --
+  # see its DISABLED.md), so there's nothing deployed here to test, and the
+  # old working-directory (./vercel-deployment/api/training-job) no longer
+  # exists -- this job would fail on checkout alone. Restore alongside
+  # DISABLED.md's restore steps if the function is ever re-enabled.
 
-  # Deploy to Vercel (on main branch)
-  deploy-vercel:
-    name: Deploy to Vercel
-    needs: [nextjs-build, python-functions-test, training-function-test, secret-scan]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-      
-      - name: Pull Vercel Environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      
-      - name: Build Project Artifacts
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-      
-      - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  # Deployment is handled by Vercel's own GitHub integration (auto-deploys
+  # on push to main), which doesn't need a stored VERCEL_TOKEN here and was
+  # actually deploying successfully while this job -- lacking that secret --
+  # failed on every run. Removed rather than wired up, to avoid two
+  # deployment paths for the same project.
 
   # Security scanning
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       
@@ -196,7 +163,13 @@ jobs:
       - name: Run pip-audit
         run: |
           pip install pip-audit
-          pip-audit
+          # Scoped to our own requirements.txt -- a bare `pip-audit` audits
+          # every package in the environment, which on this runner image
+          # includes Ubuntu's own system/cloud-init tooling (cloud-init,
+          # ubuntu-pro-client, walinuxagent, bcc, ...). Those aren't this
+          # project's dependencies and aren't ours to patch; scoping avoids
+          # failing the build on vulnerabilities we have no way to fix.
+          pip-audit -r requirements.txt
 
   # Reject commits containing real secrets or unresolved config placeholders
   secret-scan:
@@ -232,7 +205,7 @@ jobs:
   # Notify on failure
   notify-failure:
     name: Notify on Failure
-    needs: [python-test, nextjs-build, python-functions-test, training-function-test, security-scan, secret-scan]
+    needs: [python-test, nextjs-build, python-functions-test, security-scan, secret-scan]
     if: failure()
     runs-on: ubuntu-latest
     steps:

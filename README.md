@@ -11,8 +11,9 @@ fully offline inference and answer-quality scoring.
 ## Live
 
 - SaaS app: https://multillm-three.vercel.app
-- Works in **demo mode** (any email + 6-char password) until the Appwrite
-  database is provisioned.
+- Works in **demo mode** (any email + 6-char password) when Supabase env vars
+  aren't configured; wired to a real Supabase backend (auth, DB, storage)
+  otherwise.
 
 ## Repo layout
 
@@ -31,7 +32,19 @@ vercel-deployment/        Next.js 14 SaaS (dashboard, auth, API keys, billing, a
 
 ## Quickstart
 
-### 1. Run the offline ensemble (no API keys)
+### 1. Install and run the demo CLI (no API keys, fully offline)
+
+```bash
+pip install multillm-ensemble   # or: pip install -e .  (editable install from this repo)
+multillm "How does a multi-LLM ensemble improve answer quality?"
+multillm --sources "Your question here"
+multillm --top-k 5 "Compare two approaches to X"
+```
+
+The PyPI package is `multillm-ensemble` (the plain `multillm` name was already
+taken by an unrelated project); it installs a `multillm` console-script
+command (`ensemble_demo:main`, wired up in `pyproject.toml`). Equivalent
+without installing:
 
 ```bash
 python3 ensemble_demo.py "How does a multi-LLM ensemble improve answer quality?"
@@ -115,8 +128,10 @@ Both train with `python -m train.train` — no downloads, no API keys.
 - [x] Tiny models trained from scratch (offline candidate + scorer)
 - [x] SaaS dashboard (login, API keys, analytics, billing, settings, training)
 - [x] Demo mode (usable before backend is wired)
-- [ ] Provision Appwrite: project, collections, functions, real auth + persistence
-- [ ] Wire training page to real job execution
+- [x] Supabase auth/DB/storage, RLS-secured, live in production
+- [x] Training page wired to real job execution (code path complete; the
+      `training-job` Python function itself is currently excluded from
+      production deploys -- see `vercel-deployment/training-job-disabled/DISABLED.md`)
 
 ## License
 

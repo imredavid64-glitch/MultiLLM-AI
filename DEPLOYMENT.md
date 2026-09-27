@@ -59,7 +59,7 @@ Visit `http://localhost:3000` - works in **demo mode** without Supabase.
 
 ### 2. Configure Stripe
 1. Create products/prices in Stripe Dashboard
-2. Set price IDs in `src/app/api/stripe-webhook/route.ts` → `getPlanFromPriceId()`
+2. Set the `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` env vars to those price IDs (read by `getPlanFromPriceId()` in `src/app/api/stripe-webhook/route.ts` — not hardcoded in code)
 3. Add webhook endpoint: `https://your-app.vercel.app/api/stripe-webhook`
 4. Subscribe to events: `customer.subscription.*`, `invoice.payment_*`
 
@@ -145,13 +145,16 @@ All tables have RLS enabled with policies:
 ## API Endpoints
 
 ### Next.js (Frontend)
-- `POST /api/query` - Run ensemble query (proxies to Python function)
-- `POST /api/training` - Start training job
+- `POST /api/query` / `GET /api/query` - Run ensemble query (proxies to Python function) / model+health status
+- `GET /api/training` / `POST /api/training` - List / start training jobs (real Supabase-backed, user-scoped)
 - `POST /api/stripe-webhook` - Stripe webhook handler
-- `GET /api/queries` - Get user query history
-- `GET /api/api-keys` - Get user API keys
-- `POST /api/api-keys` - Add API key
-- `GET /api/subscription` - Get user subscription
+- `GET /api/api-keys` / `POST /api/api-keys` - List / create platform API keys
+- `DELETE /api/api-keys/[id]` - Revoke a platform API key
+- `GET /api/analytics` - Query history + usage analytics
+- `GET /api/client-projects` / `POST /api/client-projects` - Multi-tenant client project CRUD
+- `GET /api/account` / `DELETE /api/account` - Account info / delete account
+- `POST /api/checkout` - Create a Stripe Checkout session
+- `POST /api/billing-portal` - Create a Stripe Billing Portal session
 
 ### Python Functions (Vercel)
 - `POST /api/query` - Direct ensemble query
@@ -159,6 +162,16 @@ All tables have RLS enabled with policies:
 - `POST /api/reload-sources` - Reload knowledge sources
 - `POST /api/training/start` - Start training
 - `GET /api/training/status/{job_id}` - Check training status
+
+**Known gap:** the `training-job` function is currently excluded from
+production (`vercel-deployment/training-job-disabled/`, not under `api/`).
+It needs `torch`, whose bundle exceeds the standard 500MB Python function
+limit; enabling the large-functions beta hits what looks like a Vercel
+platform bug (`ENOENT` on an installed package file, different file each
+deploy attempt) at the final packaging step. Separately, real training runs
+can exceed the Hobby plan's hard 300s function duration cap regardless. See
+`vercel-deployment/training-job-disabled/DISABLED.md` for details and how to
+restore it once resolved (or after upgrading to Pro).
 
 ---
 
@@ -172,12 +185,21 @@ All tables have RLS enabled with policies:
 | `STRIPE_SECRET_KEY` | Yes | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Yes | Stripe webhook signing secret |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe publishable key |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Yes | Sales/support inbox used in the footer and plan-upgrade mailto links |
+| `STRIPE_PRICE_PRO` | Yes | Stripe price ID for the Pro plan |
+| `STRIPE_PRICE_ENTERPRISE` | Yes | Stripe price ID for the Enterprise plan |
 | `ENCRYPTION_KEY` | Yes | 32-byte base64 key for API encryption |
+| `INTERNAL_API_SECRET` | Yes | Shared secret Next.js sends to the Python functions |
+| `APP_ORIGIN` | Yes | Deployed app origin; CORS allow-list for the query-ensemble function |
+| `PYTHON_ENSEMBLE_URL` | Yes | URL of the deployed query-ensemble Python function |
+| `PYTHON_TRAINING_URL` | Yes | URL of the deployed training-job Python function |
 | `OPENAI_API_KEY` | No | OpenAI/OpenRouter API key |
 | `GEMINI_API_KEY` | No | Google Gemini API key |
 | `MISTRAL_API_KEY` | No | Mistral API key |
+| `GROQ_API_KEY` | No | Groq API key |
 | `BOT_COUNT` | No | Parallel bots (default: 4) |
 | `PRIVACY_REDACTION` | No | Enable PII redaction (default: 1) |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Strongly recommended in production | Shared, cross-instance rate limiting; without these, limits are per-serverless-instance only and far weaker under horizontal scaling |
 
 ---
 
@@ -211,6 +233,9 @@ npm run dev
 pytest
 
 # Next.js tests
+# NOTE: no test suite exists yet (`npm test` is undefined, so CI's
+# `npm test --if-present` currently no-ops). Add one (e.g. Vitest) before
+# relying on this.
 cd vercel-deployment && npm test
 
 # Linting

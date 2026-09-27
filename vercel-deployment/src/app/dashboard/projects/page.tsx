@@ -183,6 +183,63 @@ export default function ClientProjectsPage() {
             </div>
           )}
         </main>
+
+        {/* Create Project Modal */}
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowCreateModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">New Client Project</h2>
+              <p className="text-slate-600 mb-6">
+                Give it a name so you can tag queries and report on this client separately.
+              </p>
+
+              <div className="mb-6">
+                <label htmlFor="projectName" className="block text-sm font-medium text-slate-700 mb-1">
+                  Project Name
+                </label>
+                <input
+                  id="projectName"
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g., Acme Corp, Internal Tools"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setNewName("");
+                  }}
+                  className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreate}
+                  className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors"
+                >
+                  Create
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </div>
     </ProtectedRoute>
   );

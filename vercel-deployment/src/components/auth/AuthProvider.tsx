@@ -21,10 +21,12 @@ interface AuthContextType {
   loading: boolean;
   demoMode: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<{ needsEmailConfirmation: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -172,11 +174,18 @@ if (session?.user) {
       const u = demoUser(email, name || email.split("@")[0]);
       window.localStorage.setItem(DEMO_USER_KEY, JSON.stringify(u));
       setUser(u);
-      return;
+      return { needsEmailConfirmation: false };
     }
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
     if (error) throw error;
+    // Supabase returns a user but no session when email confirmation is
+    // required (the project default) -- there's nothing to log in with yet,
+    // so callers must not treat this the same as an immediate sign-in.
+    if (!data.session) {
+      return { needsEmailConfirmation: true };
+    }
     await fetchUser();
+    return { needsEmailConfirmation: false };
   };
 
   const logout = async () => {
@@ -211,8 +220,28 @@ if (session?.user) {
     await fetchUser();
   };
 
+  const requestPasswordReset = async (email: string) => {
+    if (demoMode) {
+      throw new Error("Password reset isn't available in demo mode (no email backend configured).");
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    if (demoMode) {
+      throw new Error("Password reset isn't available in demo mode (no email backend configured).");
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, demoMode, login, register, logout, refreshUser, updateProfile }}>
+    <AuthContext.Provider
+      value={{ user, loading, demoMode, login, register, logout, refreshUser, updateProfile, requestPasswordReset, updatePassword }}
+    >
       {children}
     </AuthContext.Provider>
   );

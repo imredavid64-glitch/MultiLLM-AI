@@ -34,9 +34,10 @@ async function callPythonTraining(endpoint: string, options: RequestInit = {}) {
 // nothing here fabricates progress. "running" is shown as a mid-way bar
 // since real per-step progress isn't reported back by the training service;
 // a job only reaches "completed"/"failed" once something actually updates
-// its row. NOTE: functions/training-job/main.py does not currently write
-// job completion back to Supabase, so today a job can stay "running"
-// indefinitely once started -- closing that loop is separate follow-up work.
+// its row. NOTE: the training-job function is currently excluded from
+// deployment (see vercel-deployment/training-job-disabled/DISABLED.md), so
+// today a job started here stays "pending" indefinitely -- there's nothing
+// on the other end of PYTHON_TRAINING_URL to advance it.
 function progressForStatus(status: string): number {
   if (status === "completed") return 100;
   if (status === "running") return 50;
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
       cpu: true,
       // Lets the training service write real completion status back to
       // this exact row once the run finishes, instead of it staying
-      // "running" forever (see functions/training-job/main.py).
+      // "running" forever. (No-op today: see progressForStatus above.)
       supabase_job_id: job.id,
     }),
   });

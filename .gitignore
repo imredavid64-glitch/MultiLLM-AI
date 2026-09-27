@@ -45,3 +45,6 @@ vercel-deployment/node_modules/
 
 # Trained model artifacts (reproducible via python -m train.train)
 models/
+
+.vercel
+.env*
