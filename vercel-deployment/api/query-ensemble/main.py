@@ -1,15 +1,23 @@
-"""Vercel Python Function: Multi-LLM Ensemble Query Endpoint"""
+"""Vercel Python Function: Multi-LLM Ensemble Query Endpoint
+
+Deployed as a Vercel Service (see vercel-deployment/vercel.json's `services`
+block) rather than a plain /api function -- Next.js's App Router claims the
+whole /api/* namespace for itself, so a sibling Python function placed
+directly under /api is unreachable in production regardless of vercel.json
+`functions` config (confirmed empirically: it silently returns Next's own
+404 page instead of ever invoking this file). Its dependencies
+(ai_client.py, local_models.py, token_optimizer.py, knowledge_sources/) are
+vendored copies in this same directory rather than imported from the
+repo root, since this project's Vercel Root Directory is vercel-deployment/
+and a deployed function can't reach files above that.
+"""
 
 from __future__ import annotations
 
 import logging
 import os
-import sys
 import time
 import uuid
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware

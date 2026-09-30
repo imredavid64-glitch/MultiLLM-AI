@@ -157,6 +157,20 @@ All tables have RLS enabled with policies:
 - `POST /api/billing-portal` - Create a Stripe Billing Portal session
 
 ### Python Functions (Vercel)
+`query-ensemble` is deployed as a Vercel **Service** (`vercel-deployment/vercel.json`'s
+`services` block), not a plain function under `api/` -- Next.js's App Router
+claims the entire `/api/*` namespace for itself, so a sibling Python
+function placed directly under `api/` is silently unreachable in
+production (confirmed empirically: it returns Next's own 404 page, never
+invokes the Python function). The Next.js app calls it privately via a
+service binding (`PYTHON_ENSEMBLE_INTERNAL_URL`, injected automatically by
+Vercel -- never set it as a project env var), not a public URL. Its
+dependencies (`ai_client.py`, `local_models.py`, `token_optimizer.py`,
+`knowledge_sources/`) are vendored copies inside
+`vercel-deployment/api/query-ensemble/`, kept in sync manually with the
+repo-root originals, since this project's Vercel Root Directory is
+`vercel-deployment/` and a deployed function can't read files above it.
+
 - `POST /api/query` - Direct ensemble query
 - `GET /api/health` - Health check
 - `POST /api/reload-sources` - Reload knowledge sources
@@ -191,7 +205,6 @@ restore it once resolved (or after upgrading to Pro).
 | `ENCRYPTION_KEY` | Yes | 32-byte base64 key for API encryption |
 | `INTERNAL_API_SECRET` | Yes | Shared secret Next.js sends to the Python functions |
 | `APP_ORIGIN` | Yes | Deployed app origin; CORS allow-list for the query-ensemble function |
-| `PYTHON_ENSEMBLE_URL` | Yes | URL of the deployed query-ensemble Python function |
 | `PYTHON_TRAINING_URL` | Yes | URL of the deployed training-job Python function |
 | `OPENAI_API_KEY` | No | OpenAI/OpenRouter API key |
 | `GEMINI_API_KEY` | No | Google Gemini API key |

@@ -43,7 +43,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const multiLLM = new MultiLLM();
-const PYTHON_ENSEMBLE_URL = process.env.PYTHON_ENSEMBLE_URL || "http://localhost:8000";
+// Vercel injects this automatically at runtime from the "backend" service
+// binding declared in vercel.json -- never set it manually as a Vercel env
+// var. Falls back to a plain localhost URL for local dev (`uvicorn` running
+// the query-ensemble function directly, outside the Services model).
+const PYTHON_ENSEMBLE_URL = process.env.PYTHON_ENSEMBLE_INTERNAL_URL || "http://localhost:8000";
 
 // Deep Review (cross-check the final answer with one extra provider call for
 // an explicit confidence score) is a paid-tier feature -- gated here, not in
