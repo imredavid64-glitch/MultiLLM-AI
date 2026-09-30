@@ -1,8 +1,28 @@
 {
-  "framework": "nextjs",
-  "functions": {
-    "api/query-ensemble/main.py": {
-      "maxDuration": 60
+  "services": {
+    "frontend": {
+      "root": ".",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "backend",
+          "format": "url",
+          "env": "PYTHON_ENSEMBLE_INTERNAL_URL"
+        }
+      ]
+    },
+    "backend": {
+      "root": "api/query-ensemble",
+      "entrypoint": "main:app",
+      "functions": {
+        "main.py": {
+          "maxDuration": 60
+        }
+      }
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
+  ]
 }
