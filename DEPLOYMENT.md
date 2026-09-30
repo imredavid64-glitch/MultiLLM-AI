@@ -280,11 +280,16 @@ npm run dev
 # Python tests
 pytest
 
-# Next.js tests
-# NOTE: no test suite exists yet (`npm test` is undefined, so CI's
-# `npm test --if-present` currently no-ops). Add one (e.g. Vitest) before
-# relying on this.
+# Next.js tests (Vitest, Node environment -- no jsdom/RTL; these test API
+# route handlers directly, not rendered components. Coverage prioritizes
+# routes with real logic to regress: auth/tier gating and the
+# ensemble-unreachable fallback in /api/query, ownership checks in
+# /api/client-projects[/[id]], tier-bypass in /api/api-keys. Supabase/auth
+# calls are mocked (vi.mock), never hitting a real database.)
 cd vercel-deployment && npm test
+# `npm run test:watch` for interactive/watch mode.
+# Requires Node >=22.12 (vitest 5's minimum) -- CI's NODE_VERSION reflects
+# this; matters for local runs too if your Node is older.
 
 # Linting
 ruff check .           # Python
