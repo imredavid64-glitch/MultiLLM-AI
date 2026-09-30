@@ -180,7 +180,24 @@ platform bug (`ENOENT` on an installed package file, different file each
 deploy attempt) at the final packaging step. Separately, real training runs
 can exceed the Hobby plan's hard 300s function duration cap regardless. See
 `vercel-deployment/training-job-disabled/DISABLED.md` for details and how to
-restore it once resolved (or after upgrading to Pro).
+restore it once resolved (or after upgrading to Pro). The dashboard's
+Training page reflects this honestly (a "Coming soon" state, not a
+silently-broken form) rather than pretending the feature works.
+
+### Known limitations: where should training actually run?
+
+Recommendation: **move `training-job` to a small dedicated host (Railway
+or Fly.io) rather than keep chasing the Vercel large-functions bug.**
+Vercel's serverless model fundamentally isn't a good fit for this specific
+function -- it needs a large ML dependency (`torch`) and can run for
+several minutes, both of which fight the platform's per-function size and
+duration limits by design, not as an incidental bug to route around.
+Railway and Fly.io both run a persistent container with no such
+size/duration ceiling, at a similar hobby-tier price point, and Vercel
+would still front the rest of the app (Next.js + query-ensemble, neither
+of which have this problem) exactly as it does today -- only
+`PYTHON_TRAINING_URL` would point elsewhere. Not attempted this session;
+this is a recommendation, not a migration.
 
 ---
 
