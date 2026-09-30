@@ -206,6 +206,34 @@ restore it once resolved (or after upgrading to Pro).
 
 ---
 
+## Agency Demo Accounts
+
+To let an agency try the product before signing up for real, provision them
+a temporary account directly (no self-serve signup needed):
+
+```bash
+vercel env pull .env.local   # once, to get NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY locally
+cd vercel-deployment
+node --env-file=.env.local scripts/demo-account.mjs create --email agency@example.com --name "Acme Agency"
+```
+
+Prints a dashboard login (email + generated password) and a platform API
+key, both shown once. Defaults to a `pro`-tier account, 200 credits, and a
+14-day expiry (`--days`, `--credits`, `--tier` override these). Both the
+credit cap and the expiry date are actually enforced in `/api/query` (see
+`profiles.is_active` / `plan_expires_at` checks there) -- not just cosmetic.
+
+To end access before it naturally expires:
+```bash
+node --env-file=.env.local scripts/demo-account.mjs revoke --email agency@example.com
+```
+
+This is a local admin script, not an API route -- nothing about it is
+reachable from the deployed app. It uses only the existing `profiles` and
+`platform_api_keys` tables; no schema changes.
+
+---
+
 ## Local Development with Real Backend
 
 1. Start Supabase locally:
