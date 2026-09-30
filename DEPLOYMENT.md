@@ -41,7 +41,6 @@ Visit `http://localhost:3000` - works in **demo mode** without Supabase.
 ### Prerequisites
 - **Supabase** project
 - **Vercel** account
-- **Stripe** account (for billing)
 - **GitHub** repository
 
 ### 1. Provision Supabase
@@ -57,13 +56,7 @@ Visit `http://localhost:3000` - works in **demo mode** without Supabase.
 #    - service_role key (secret)
 ```
 
-### 2. Configure Stripe
-1. Create products/prices in Stripe Dashboard
-2. Set the `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` env vars to those price IDs (read by `getPlanFromPriceId()` in `src/app/api/stripe-webhook/route.ts` — not hardcoded in code)
-3. Add webhook endpoint: `https://your-app.vercel.app/api/stripe-webhook`
-4. Subscribe to events: `customer.subscription.*`, `invoice.payment_*`
-
-### 3. Deploy to Vercel
+### 2. Deploy to Vercel
 ```bash
 # Via Vercel CLI
 vercel --prod
@@ -77,16 +70,14 @@ Required Vercel Environment Variables:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-STRIPE_SECRET_KEY
-STRIPE_WEBHOOK_SECRET
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENCRYPTION_KEY
+NEXT_PUBLIC_CONTACT_EMAIL
 OPENAI_API_KEY (optional)
 GEMINI_API_KEY (optional)
 MISTRAL_API_KEY (optional)
 ```
 
-### 4. Generate Encryption Key
+### 3. Generate Encryption Key
 ```bash
 python -c "import secrets, base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
 ```
@@ -97,11 +88,11 @@ Add output as `ENCRYPTION_KEY` in Vercel.
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Next.js App   │────▶│  Supabase        │────▶│  Stripe         │
-│   (Vercel)      │     │  (Auth, DB,      │     │  (Billing)      │
-│                 │     │   Storage,       │     │                 │
-└─────────────────┘     │   Realtime)      │     └─────────────────┘
+┌─────────────────┐     ┌──────────────────┐
+│   Next.js App   │────▶│  Supabase        │
+│   (Vercel)      │     │  (Auth, DB,      │
+│                 │     │   Storage,       │
+└─────────────────┘     │   Realtime)      │
                         └────────┬─────────┘
                                  │
                     ┌────────────┴────────────┐
@@ -129,7 +120,7 @@ Add output as `ENCRYPTION_KEY` in Vercel.
 - **api_keys** - Encrypted user API keys
 - **queries** - Query history with full traceability
 - **training_jobs** - Training job tracking
-- **subscriptions** - Stripe subscription sync
+- **subscriptions** - Plan/subscription state (updated manually, not by a payment processor -- see billing note below)
 
 ### Row Level Security
 All tables have RLS enabled with policies:
@@ -147,14 +138,18 @@ All tables have RLS enabled with policies:
 ### Next.js (Frontend)
 - `POST /api/query` / `GET /api/query` - Run ensemble query (proxies to Python function) / model+health status
 - `GET /api/training` / `POST /api/training` - List / start training jobs (real Supabase-backed, user-scoped)
-- `POST /api/stripe-webhook` - Stripe webhook handler
 - `GET /api/api-keys` / `POST /api/api-keys` - List / create platform API keys
 - `DELETE /api/api-keys/[id]` - Revoke a platform API key
 - `GET /api/analytics` - Query history + usage analytics
 - `GET /api/client-projects` / `POST /api/client-projects` - Multi-tenant client project CRUD
 - `GET /api/account` / `DELETE /api/account` - Account info / delete account
-- `POST /api/checkout` - Create a Stripe Checkout session
-- `POST /api/billing-portal` - Create a Stripe Billing Portal session
+
+**Billing:** there is no payment processor and no billing API route. Every
+plan change (upgrade/downgrade/cancellation) and billing question is a
+`mailto:` link to `NEXT_PUBLIC_CONTACT_EMAIL`, handled manually. The
+`subscriptions` table's `plan`/`status`/`credits_included` columns are
+updated by hand (e.g. via the Supabase dashboard or a script) when a
+request is fulfilled.
 
 ### Python Functions (Vercel)
 `query-ensemble` is deployed as a Vercel **Service** (`vercel-deployment/vercel.json`'s
@@ -196,12 +191,7 @@ restore it once resolved (or after upgrading to Pro).
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
-| `STRIPE_SECRET_KEY` | Yes | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe webhook signing secret |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe publishable key |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | Yes | Sales/support inbox used in the footer and plan-upgrade mailto links |
-| `STRIPE_PRICE_PRO` | Yes | Stripe price ID for the Pro plan |
-| `STRIPE_PRICE_ENTERPRISE` | Yes | Stripe price ID for the Enterprise plan |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Yes | Sales/support inbox used in the footer and every billing mailto link (there is no payment processor) |
 | `ENCRYPTION_KEY` | Yes | 32-byte base64 key for API encryption |
 | `INTERNAL_API_SECRET` | Yes | Shared secret Next.js sends to the Python functions |
 | `APP_ORIGIN` | Yes | Deployed app origin; CORS allow-list for the query-ensemble function |
@@ -269,7 +259,6 @@ cd vercel-deployment && npm run db:generate-types
 
 - **Vercel**: Function logs in Vercel Dashboard
 - **Supabase**: Logs in Supabase Dashboard > Logs
-- **Stripe**: Webhook delivery logs in Stripe Dashboard > Developers > Webhooks
 
 ---
 
@@ -283,9 +272,6 @@ Run `python -m train.train` to generate local models.
 
 ### Supabase connection failed
 Check `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Ensure RLS policies allow the operations.
-
-### Stripe webhook fails
-Verify webhook URL is accessible and `STRIPE_WEBHOOK_SECRET` matches Stripe Dashboard.
 
 ### Python function timeout
 Increase `maxDuration` in `vercel.json` (max 60s for query, 3600s for training).
@@ -306,7 +292,6 @@ Increase `maxDuration` in `vercel.json` (max 60s for query, 3600s for training).
 
 - [ ] `ENCRYPTION_KEY` is 32-byte base64, stored only in secure env
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` only used server-side
-- [ ] Stripe webhook signature verification enabled
 - [ ] API keys encrypted at rest (using `encryption.py`)
 - [ ] PII redaction enabled (`PRIVACY_REDACTION=1`)
 - [ ] HTTPS enforced (Vercel default)

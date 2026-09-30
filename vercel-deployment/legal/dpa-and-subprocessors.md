@@ -26,9 +26,8 @@ This Data Processing Agreement (DPA) describes how [COMPANY LEGAL NAME] ("Proces
 | Groq | AI model inference (used for regular queries and for the optional Deep Review confidence check -- not exclusive to either) | United States |
 | Vercel | Application hosting | [confirm region/plan] |
 | Supabase | Auth, database, and file storage | European Union (eu-central-1 / AWS Frankfurt) |
-| Stripe | Payment processing (once configured) | United States / EU (Stripe Ireland for EU customers) |
 
-*Keep this table current -- add a sub-processor here and notify active customers before routing their prompts through it. Anthropic and ClickHouse Cloud were removed from this list: neither is integrated anywhere in the codebase (no Anthropic API client exists, and ClickHouse was explicitly decided out of scope for this product) -- don't represent them as sub-processors unless and until they're actually built. Mistral is optional (only active if a Mistral key is configured) -- same for OpenAI/OpenRouter and Groq; only providers with a configured API key are ever actually sent data. Update this table again once real production keys are locked in.*
+*Keep this table current -- add a sub-processor here and notify active customers before routing their prompts through it. Anthropic and ClickHouse Cloud were removed from this list: neither is integrated anywhere in the codebase (no Anthropic API client exists, and ClickHouse was explicitly decided out of scope for this product) -- don't represent them as sub-processors unless and until they're actually built. Stripe was removed: there is no payment processor in this product; billing is a manual, direct arrangement, not an automated card-payment flow. Mistral is optional (only active if a Mistral key is configured) -- same for OpenAI/OpenRouter and Groq; only providers with a configured API key are ever actually sent data. Update this table again once real production keys are locked in.*
 
 ## Sub-processor changes
 

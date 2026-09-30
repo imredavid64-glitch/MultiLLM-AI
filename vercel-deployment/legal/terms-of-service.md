@@ -20,8 +20,8 @@ MultiLLM is an API and dashboard that sends your prompts to one or more third-pa
 
 ## 4. Plans and billing
 
-- Current plans and prices are listed at [PRICING PAGE URL] (Base, Growth, Enterprise). Prices may change with 30 days' notice for existing subscribers.
-- Subscriptions renew automatically each billing period until cancelled. Cancelling stops future renewals; it does not refund the current period unless required by law.
+- Current plans and prices are listed at [PRICING PAGE URL]. Prices may change with 30 days' notice for existing subscribers.
+- There is no automated payment processor. Upgrading, downgrading, or cancelling a plan is a direct request handled by our team, not a self-service card transaction; nothing renews or charges automatically.
 - Fees are billed in [CURRENCY] and are exclusive of applicable taxes (e.g., VAT), which are added where required.
 
 ## 5. Acceptable use

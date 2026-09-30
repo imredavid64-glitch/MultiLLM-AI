@@ -28,7 +28,6 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
     "remark-gfm": "^4.0.1",
-    "stripe": "^22.6.1",
     "swr": "^2.0.1",
     "tailwind-merge": "^1.14.0"
   },
