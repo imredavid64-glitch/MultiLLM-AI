@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain, CheckCircle2 } from "lucide-react";
+import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain, CheckCircle2, Sparkles } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { SustainabilityMetrics } from "@/types/multi-llm";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -18,7 +18,14 @@ export default function HomePage() {
   const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<
-    null | { answer: string; metrics: SustainabilityMetrics; deep_review_confidence?: number | null }
+    | null
+    | {
+        answer: string;
+        metrics: SustainabilityMetrics;
+        deep_review_confidence?: number | null;
+        refined_prompt?: string | null;
+        token_savings?: { tokens_saved_pct?: number } | null;
+      }
   >(null);
   const [isLoading, setIsLoading] = useState(false);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
@@ -246,7 +253,14 @@ export default function HomePage() {
               <p className="text-slate-700 whitespace-pre-wrap leading-relaxed mb-6">
                 {result.answer}
               </p>
-              
+
+              {result.refined_prompt && (
+                <p className="text-xs text-slate-500 mb-6 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                  Your prompt was automatically optimized before sending it to the providers.
+                </p>
+              )}
+
               {/* Compact metrics row - sustainability as small bonus */}
               <div className="pt-6 border-t border-slate-200">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
@@ -280,6 +294,14 @@ export default function HomePage() {
                         {(result.deep_review_confidence * 100).toFixed(0)}%
                       </div>
                       <div className="text-xs text-slate-500">Deep Review Confidence</div>
+                    </div>
+                  )}
+                  {typeof result.token_savings?.tokens_saved_pct === "number" && (
+                    <div>
+                      <div className="text-xl font-bold text-indigo-600">
+                        {result.token_savings.tokens_saved_pct.toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-slate-500">Prompt Tokens Saved</div>
                     </div>
                   )}
                 </div>
