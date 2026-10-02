@@ -1,7 +1,7 @@
 import { CheckCircle2, Gauge, Sparkles } from "lucide-react";
 
 export const metadata = {
-  title: "Test Results — MultiLLM",
+  title: "Test Results",
   description: "Real, unedited test and evaluation results for the MultiLLM ensemble and its trained models.",
 };
 

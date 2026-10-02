@@ -2,7 +2,7 @@ import LegalDocument from "@/components/legal/LegalDocument";
 import { readLegalDoc } from "@/lib/legalDocs";
 
 export const metadata = {
-  title: "Terms of Service - MultiLLM",
+  title: "Terms of Service",
 };
 
 export default function TermsPage() {

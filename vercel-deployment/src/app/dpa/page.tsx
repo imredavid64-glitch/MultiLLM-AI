@@ -2,7 +2,7 @@ import LegalDocument from "@/components/legal/LegalDocument";
 import { readLegalDoc } from "@/lib/legalDocs";
 
 export const metadata = {
-  title: "DPA & Sub-processors - MultiLLM",
+  title: "DPA & Sub-processors",
 };
 
 export default function DpaPage() {
