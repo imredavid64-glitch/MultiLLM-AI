@@ -184,6 +184,31 @@ restore it once resolved (or after upgrading to Pro). The dashboard's
 Training page reflects this honestly (a "Coming soon" state, not a
 silently-broken form) rather than pretending the feature works.
 
+### API key rotation on rate limits / token optimization
+
+Two related things live in `ai_client.py` (vendored into
+`vercel-deployment/api/query-ensemble/`):
+
+- **Prompt/context token optimization** (`token_optimizer.py`, wired into
+  `build_ensemble_answer`): trims retrieved sources and chat history before
+  they're sent to any provider, reported back to the caller as
+  `token_savings` (shown on the dashboard as "Prompt Tokens Saved"). This
+  already existed; not new.
+- **Key-drain circuit breaker** (`RoundRobinKeys`, `build_provider_stack`):
+  when a provider API key gets a rate-limit/quota response, it's marked
+  "drained" for `KEY_DRAIN_COOLDOWN_SECONDS` (default 300s) and skipped on
+  subsequent calls instead of being retried immediately. Shared across
+  serverless instances via `UPSTASH_REDIS_REST_URL`/`TOKEN` when configured
+  (falls back to in-memory per instance otherwise -- same trade-off as the
+  Next.js rate limiter). When a user's own BYO key for a provider is
+  supplied, the platform's own key for that same provider (if configured) is
+  attached as a lower-priority fallback, so a drained BYO key doesn't fail
+  that user's query outright -- except for the combined OpenAI/OpenRouter
+  slot, where a user's OpenRouter key and the platform's real OpenAI key
+  need different base URLs and can't safely share one `OpenAIProvider`
+  instance; that combination keeps the original behavior (BYO key only, no
+  platform fallback).
+
 ### Known limitations: where should training actually run?
 
 Recommendation: **move `training-job` to a small dedicated host (Railway
@@ -220,7 +245,8 @@ this is a recommendation, not a migration.
 | `ANON_DAILY_QUERY_CAP` | No | Global daily cap across all anonymous (no-account) queries combined, on top of the 3/min per-IP limit (default: 200) |
 | `BOT_COUNT` | No | Parallel bots (default: 4) |
 | `PRIVACY_REDACTION` | No | Enable PII redaction (default: 1) |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Strongly recommended in production | Shared, cross-instance rate limiting; without these, limits are per-serverless-instance only and far weaker under horizontal scaling |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Strongly recommended in production | Shared, cross-instance rate limiting *and* the ensemble's key-drain circuit breaker (below); without these, both fall back to per-serverless-instance memory, far weaker under horizontal scaling |
+| `KEY_DRAIN_COOLDOWN_SECONDS` | No | How long a provider API key that just got rate-limited is skipped before being retried (default: 300). Uses `UPSTASH_REDIS_REST_URL`/`TOKEN` above when set, so the drain mark is shared across instances; otherwise in-memory per instance. See "API key rotation on rate limits" below |
 
 ---
 

@@ -6,6 +6,7 @@
 # here too (or vice versa).
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -95,6 +96,13 @@ MAX_RETRIES = 4
 MAX_HISTORY_MESSAGES = 12
 MAX_PARALLEL_BOTS = 8
 TOP_K_SOURCES = 6
+
+# How long a key that just got rate-limited/quota-exceeded is skipped for
+# (RoundRobinKeys below), before being tried again. A guess at a reasonable
+# default, not derived from any specific provider's actual reset window --
+# tune via env if it's too short (keeps retrying a dead key) or too long
+# (skips a key that already recovered).
+KEY_DRAIN_COOLDOWN_SECONDS = int(os.environ.get("KEY_DRAIN_COOLDOWN_SECONDS", "300") or "300")
 
 SAVE_HISTORY_DEFAULT = os.environ.get("SAVE_HISTORY", "1").strip() == "1"
 PRIVACY_REDACTION_DEFAULT = os.environ.get("PRIVACY_REDACTION", "1").strip() == "1"
@@ -271,20 +279,146 @@ def _translate_rep_penalty(value: float) -> float:
     return round(value - 1.0, 3)
 
 
-class RoundRobinKeys:
-    def __init__(self, keys: Sequence[str]) -> None:
-        self._keys = list(keys)
-        self._cursor = 0
+# ---- Key-health circuit breaker --------------------------------------
+#
+# When a provider call fails with a rate-limit/quota error, the key that
+# made the call is marked "drained" for KEY_DRAIN_COOLDOWN_SECONDS so
+# RoundRobinKeys.next() skips it rather than retrying the same dead key on
+# every subsequent request. Backed by Upstash Redis's REST API (the same
+# UPSTASH_REDIS_REST_URL/TOKEN the Next.js app's rateLimiter.ts uses) when
+# configured, so the mark is visible across every serverless instance --
+# otherwise an in-process dict, same fallback trade-off as that TS rate
+# limiter (bounds the blast radius to one instance, never a hard failure).
+# Keys are never stored or logged in the clear -- only a short, irreversible
+# hash, scoped per-provider.
+def _key_fingerprint(provider_name: str, api_key: str) -> str:
+    digest = hashlib.sha256(f"{provider_name}:{api_key}".encode("utf-8")).hexdigest()
+    return f"keyhealth:{digest[:40]}"
+
+
+class _InMemoryKeyHealth:
+    def __init__(self) -> None:
+        self._drained_until: Dict[str, float] = {}
         self._lock = threading.Lock()
+
+    def is_drained(self, fingerprint: str) -> bool:
+        with self._lock:
+            until = self._drained_until.get(fingerprint)
+            if until is None:
+                return False
+            if time.time() >= until:
+                del self._drained_until[fingerprint]
+                return False
+            return True
+
+    def mark_drained(self, fingerprint: str, cooldown_seconds: int) -> None:
+        with self._lock:
+            self._drained_until[fingerprint] = time.time() + cooldown_seconds
+
+
+class _RedisKeyHealth:
+    def __init__(self, base_url: str, token: str) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._token = token
+
+    def _command(self, *parts: Any) -> Any:
+        path = "/".join(urllib.parse.quote(str(p), safe="") for p in parts)
+        response = httpx.get(  # type: ignore[union-attr]
+            f"{self._base_url}/{path}",
+            headers={"Authorization": f"Bearer {self._token}"},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        return response.json().get("result")
+
+    def is_drained(self, fingerprint: str) -> bool:
+        try:
+            return bool(self._command("GET", fingerprint))
+        except Exception as exc:
+            # Fail open -- an unreachable Redis shouldn't block queries that
+            # would otherwise succeed on a perfectly good key.
+            logger.warning("Key-health Redis check failed, assuming not drained: %s", exc)
+            return False
+
+    def mark_drained(self, fingerprint: str, cooldown_seconds: int) -> None:
+        try:
+            self._command("SET", fingerprint, "1", "EX", cooldown_seconds)
+        except Exception as exc:
+            logger.warning("Key-health Redis write failed (drain mark lost): %s", exc)
+
+
+def _build_key_health_backend() -> "_InMemoryKeyHealth | _RedisKeyHealth":
+    url = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip()
+    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
+    if url and token and httpx is not None:
+        return _RedisKeyHealth(url, token)
+    return _InMemoryKeyHealth()
+
+
+_KEY_HEALTH = _build_key_health_backend()
+
+
+class RoundRobinKeys:
+    """Rotates through API keys, skipping ones currently marked drained.
+
+    `keys` is either a flat sequence of key strings (all equal priority), or
+    a sequence of (key, tier) pairs where a lower tier number is tried
+    first -- e.g. a user's own BYO key as tier 0 and the platform's own key
+    as tier 1, so the platform key is only ever used once every one of the
+    user's own keys is drained. `provider_name` scopes drained-state lookups
+    (pass "" to disable drain-tracking entirely, e.g. for tests).
+    """
+
+    def __init__(self, keys: Sequence[Any], provider_name: str = "") -> None:
+        normalized: List[Tuple[str, int]] = []
+        for item in keys:
+            if isinstance(item, tuple):
+                normalized.append((item[0], item[1]))
+            else:
+                normalized.append((item, 0))
+        self._keys = normalized
+        self._provider_name = provider_name
+        self._cursors: Dict[int, int] = {}
+        self._lock = threading.Lock()
+
+    def _is_drained(self, key: str) -> bool:
+        if not self._provider_name:
+            return False
+        return _KEY_HEALTH.is_drained(_key_fingerprint(self._provider_name, key))
 
     def next(self) -> str:
         with self._lock:
-            key = self._keys[self._cursor % len(self._keys)]
-            self._cursor += 1
-            return key
+            tiers = sorted(set(tier for _, tier in self._keys))
+            for tier in tiers:
+                live = [k for k, t in self._keys if t == tier and not self._is_drained(k)]
+                if live:
+                    cursor = self._cursors.get(tier, 0)
+                    key = live[cursor % len(live)]
+                    self._cursors[tier] = cursor + 1
+                    return key
+            # Every key in every tier is currently marked drained. Degrade
+            # gracefully -- return the highest-priority key anyway rather
+            # than raising; the caller's own retry/error handling takes over,
+            # and a wrong cooldown (the provider actually recovered early)
+            # shouldn't permanently wedge the whole provider.
+            return self._keys[0][0]
+
+    def mark_drained(self, key: str, cooldown_seconds: int = KEY_DRAIN_COOLDOWN_SECONDS) -> None:
+        if self._provider_name:
+            _KEY_HEALTH.mark_drained(_key_fingerprint(self._provider_name, key), cooldown_seconds)
 
     def size(self) -> int:
         return len(self._keys)
+
+    def all_keys(self) -> List[str]:
+        """Unique key strings across every tier, in tier order -- for a
+        caller (OpenAIProvider) that needs to pre-build one client per key
+        rather than calling next() per request."""
+        seen: List[str] = []
+        for key, _tier in self._keys:
+            if key not in seen:
+                seen.append(key)
+        return seen
 
 
 def normalize_whitespace(text: str) -> str:
@@ -463,7 +597,7 @@ def extract_mistral_text(payload: Dict) -> str:
 
 
 class OpenAIProvider:
-    def __init__(self, api_keys: Sequence[str], model: str, base_url: str = "") -> None:
+    def __init__(self, api_keys: Sequence[Any], model: str, base_url: str = "") -> None:
         self.model = model
         self.base_url = base_url.strip()
         if "openrouter.ai" in self.base_url:
@@ -472,21 +606,14 @@ class OpenAIProvider:
             self.name = "Groq (OpenAI API)"
         else:
             self.name = "OpenAI-compatible"
-        self._clients: List[OpenAI] = []
-        for key in api_keys:
-            client = OpenAI(api_key=key, base_url=self.base_url) if self.base_url else OpenAI(api_key=key)
-            self._clients.append(client)
-        self._cursor = 0
-        self._lock = threading.Lock()
-
-    def _next_client(self) -> OpenAI:
-        with self._lock:
-            client = self._clients[self._cursor % len(self._clients)]
-            self._cursor += 1
-            return client
+        self._keys = RoundRobinKeys(api_keys, provider_name=self.name)
+        self._clients: Dict[str, OpenAI] = {
+            key: (OpenAI(api_key=key, base_url=self.base_url) if self.base_url else OpenAI(api_key=key))
+            for key in self._keys.all_keys()
+        }
 
     def size(self) -> int:
-        return len(self._clients)
+        return self._keys.size()
 
     def chat(
         self,
@@ -506,14 +633,22 @@ class OpenAIProvider:
             kwargs["presence_penalty"] = 0.0
         last_error: Exception | None = None
         for attempt in range(MAX_RETRIES):
-            client = self._next_client()
+            key = self._keys.next()
+            client = self._clients[key]
             try:
                 response = client.chat.completions.create(**kwargs)
                 text = extract_text_from_openai_like(response)
                 if text:
                     return text
                 last_error = RuntimeError("Empty response from OpenAI-compatible provider")
-            except (RateLimitError, APITimeoutError, APIError) as exc:
+            except RateLimitError as exc:
+                last_error = exc
+                self._keys.mark_drained(key)
+                logger.warning(
+                    "%s attempt %d/%d failed (key marked drained): %s", self.name, attempt + 1, MAX_RETRIES, exc
+                )
+                time.sleep(2**attempt)
+            except (APITimeoutError, APIError) as exc:
                 last_error = exc
                 logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
                 time.sleep(2**attempt)
@@ -526,10 +661,10 @@ class OpenAIProvider:
 
 
 class GeminiProvider:
-    def __init__(self, api_keys: Sequence[str], model: str) -> None:
+    def __init__(self, api_keys: Sequence[Any], model: str) -> None:
         self.name = "Google Gemini"
         self.model = model
-        self._keys = RoundRobinKeys(api_keys)
+        self._keys = RoundRobinKeys(api_keys, provider_name=self.name)
         self._model_candidates = self._build_model_candidates(model)
         self._model_lock = threading.Lock()
 
@@ -610,6 +745,8 @@ class GeminiProvider:
                         break
                     # Quota or auth errors can vary by model; try next model quickly.
                     if "HTTP 429" in str(exc) or "HTTP 401" in str(exc) or "HTTP 403" in str(exc):
+                        if "HTTP 429" in str(exc):
+                            self._keys.mark_drained(key)
                         break
                     time.sleep(2**attempt)
         logger.error("%s call failed after retries: %s", self.name, last_error)
@@ -617,10 +754,10 @@ class GeminiProvider:
 
 
 class MistralProvider:
-    def __init__(self, api_keys: Sequence[str], model: str) -> None:
+    def __init__(self, api_keys: Sequence[Any], model: str) -> None:
         self.name = "Mistral"
         self.model = model
-        self._keys = RoundRobinKeys(api_keys)
+        self._keys = RoundRobinKeys(api_keys, provider_name=self.name)
 
     def size(self) -> int:
         return self._keys.size()
@@ -665,10 +802,28 @@ class MistralProvider:
                 last_error = RuntimeError("Empty response from Mistral provider")
             except Exception as exc:
                 last_error = exc
+                if "HTTP 429" in str(exc):
+                    self._keys.mark_drained(key)
                 logger.warning("%s attempt %d/%d failed: %s", self.name, attempt + 1, MAX_RETRIES, exc)
                 time.sleep(2**attempt)
         logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
+
+
+def _tiered_keys(
+    user_keys: "List[str] | None", platform_keys: "List[str] | None"
+) -> "List[Tuple[str, int]] | List[str]":
+    """User-supplied (BYO) keys are tier 0, tried first; the platform's own
+    keys are appended as tier 1, a fallback RoundRobinKeys only reaches for
+    once every tier-0 key is marked drained (rate-limited/quota-exceeded) --
+    so a user's exhausted key doesn't fail their query outright when the
+    platform has its own key for the same provider. If the caller supplied
+    no keys of their own, platform keys are returned as a plain list (most
+    requests are platform-only; this keeps that path's type unchanged).
+    """
+    if user_keys:
+        return [(k, 0) for k in user_keys] + [(k, 1) for k in (platform_keys or [])]
+    return platform_keys or []
 
 
 def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> List[ChatProvider]:
@@ -681,6 +836,13 @@ def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> Lis
     platform's env-configured keys, so the ensemble stays multi-provider even
     for a user who only connected one of their own keys. Never log the
     contents of `user_keys`.
+
+    When a user DOES supply a key for a provider, the platform's own key for
+    that same provider (if any) is still loaded and attached as a tier-1
+    fallback (see _tiered_keys) -- so if the user's key gets rate-limited
+    mid-request, the platform's key picks up the rest of that request and
+    every subsequent one, rather than failing that provider for the user
+    until they notice and fix their key.
     """
     user_keys = user_keys or {}
     providers: List[ChatProvider] = []
@@ -693,45 +855,63 @@ def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> Lis
     except Exception as exc:
         logger.debug("Local model provider unavailable: %s", exc)
 
-    openai_keys = (
-        user_keys.get("openai")
-        or user_keys.get("openrouter")
-        or load_keys_from_env(
-            multi_env="OPENAI_API_KEYS",
-            single_env="OPENAI_API_KEY",
-            file_env="OPENAI_API_KEYS_FILE",
-        )
+    user_openai_keys = user_keys.get("openai") or user_keys.get("openrouter")
+    platform_openai_keys = load_keys_from_env(
+        multi_env="OPENAI_API_KEYS",
+        single_env="OPENAI_API_KEY",
+        file_env="OPENAI_API_KEYS_FILE",
     )
+    # The "openai" slot is also where OpenRouter keys live (same OpenAI-
+    # compatible client, different base_url inferred from the key's own
+    # prefix -- see infer_openai_base_url). A user's OpenRouter key and the
+    # platform's real OpenAI key need two different base_urls, and a single
+    # OpenAIProvider instance only has one -- so tiering them together is
+    # only safe when both resolve to the SAME base_url. Otherwise, keep the
+    # pre-existing behavior: the user's key alone, no platform fallback for
+    # this provider (same as before this feature existed, not worse).
+    if (
+        user_openai_keys
+        and platform_openai_keys
+        and infer_openai_base_url(user_openai_keys) == infer_openai_base_url(platform_openai_keys)
+    ):
+        openai_keys = _tiered_keys(user_openai_keys, platform_openai_keys)
+    else:
+        openai_keys = user_openai_keys or platform_openai_keys
     if openai_keys:
-        base_url = infer_openai_base_url(openai_keys)
+        base_url = infer_openai_base_url(user_openai_keys or platform_openai_keys or [])
         openai_model = os.environ.get("OPENAI_MODEL", "").strip()
         if not openai_model:
             openai_model = DEFAULT_OPENROUTER_MODEL if "openrouter.ai" in base_url else DEFAULT_OPENAI_MODEL
         providers.append(OpenAIProvider(api_keys=openai_keys, model=openai_model, base_url=base_url))
 
-    gemini_keys = user_keys.get("gemini") or load_keys_from_env(
+    platform_gemini_keys = load_keys_from_env(
         multi_env="GEMINI_API_KEYS",
         single_env="GEMINI_API_KEY",
         file_env="GEMINI_API_KEYS_FILE",
     )
+    gemini_keys = _tiered_keys(user_keys.get("gemini"), platform_gemini_keys)
     if gemini_keys:
         gemini_model = os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
         providers.append(GeminiProvider(api_keys=gemini_keys, model=gemini_model))
 
-    mistral_keys = user_keys.get("mistral") or load_keys_from_env(
+    platform_mistral_keys = load_keys_from_env(
         multi_env="MISTRAL_API_KEYS",
         single_env="MISTRAL_API_KEY",
         file_env="MISTRAL_API_KEYS_FILE",
     )
+    mistral_keys = _tiered_keys(user_keys.get("mistral"), platform_mistral_keys)
     if mistral_keys:
         mistral_model = os.environ.get("MISTRAL_MODEL", DEFAULT_MISTRAL_MODEL).strip() or DEFAULT_MISTRAL_MODEL
         providers.append(MistralProvider(api_keys=mistral_keys, model=mistral_model))
 
-    groq_keys = user_keys.get("groq") or load_keys_from_env(
+    # Groq has one fixed base_url regardless of key source, so unlike the
+    # "openai" slot above there's no base_url ambiguity -- always safe to tier.
+    platform_groq_keys = load_keys_from_env(
         multi_env="GROQ_API_KEYS",
         single_env="GROQ_API_KEY",
         file_env="GROQ_API_KEYS_FILE",
     )
+    groq_keys = _tiered_keys(user_keys.get("groq"), platform_groq_keys)
     if groq_keys:
         groq_model = os.environ.get("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
         providers.append(OpenAIProvider(api_keys=groq_keys, model=groq_model, base_url=GROQ_BASE_URL))

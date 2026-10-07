@@ -8,6 +8,7 @@ No real network calls or API keys are used anywhere in this file.
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from typing import Dict, Sequence
 
@@ -18,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ai_client import (
     RoundRobinKeys,
     SourceChunk,
+    _tiered_keys,
     bias_score,
     build_ensemble_answer,
     clarity_score,
@@ -167,6 +169,66 @@ def test_round_robin_keys_wraps_around():
 
 def test_round_robin_keys_size():
     assert RoundRobinKeys(["a", "b", "c"]).size() == 3
+
+
+# ---------------------------------------------------------------------------
+# RoundRobinKeys -- drain tracking (the key-rotation-on-rate-limit feature)
+# and tiering (a user's own BYO key tried before the platform's fallback key)
+# ---------------------------------------------------------------------------
+
+
+def test_round_robin_keys_prefers_tier_0_until_drained():
+    rr = RoundRobinKeys([("user-key", 0), ("platform-key", 1)], provider_name="test-provider-tiering")
+    assert rr.next() == "user-key"
+    assert rr.next() == "user-key"
+    rr.mark_drained("user-key", cooldown_seconds=60)
+    assert rr.next() == "platform-key"
+    assert rr.next() == "platform-key"
+
+
+def test_round_robin_keys_drained_key_recovers_after_cooldown():
+    rr = RoundRobinKeys(["a", "b"], provider_name="test-provider-recovery")
+    rr.mark_drained("a", cooldown_seconds=0.05)
+    assert rr.next() == "b"
+    time.sleep(0.1)
+    seen = {rr.next() for _ in range(4)}
+    assert "a" in seen
+
+
+def test_round_robin_keys_without_provider_name_ignores_drain():
+    # provider_name="" (the default) disables drain-tracking entirely --
+    # matters for every pre-existing call site/test that never opted in.
+    rr = RoundRobinKeys(["a", "b"])
+    rr.mark_drained("a", cooldown_seconds=9999)
+    assert [rr.next() for _ in range(2)] == ["a", "b"]
+
+
+def test_round_robin_keys_degrades_gracefully_when_everything_drained():
+    rr = RoundRobinKeys([("only-key", 0)], provider_name="test-provider-all-drained")
+    rr.mark_drained("only-key", cooldown_seconds=60)
+    # No live key anywhere -- still returns something rather than raising;
+    # the caller's own retry/error handling is what actually surfaces the
+    # failure to the user.
+    assert rr.next() == "only-key"
+
+
+# ---------------------------------------------------------------------------
+# _tiered_keys
+# ---------------------------------------------------------------------------
+
+
+def test_tiered_keys_tiers_user_keys_ahead_of_platform_keys():
+    assert _tiered_keys(["u1", "u2"], ["p1"]) == [("u1", 0), ("u2", 0), ("p1", 1)]
+
+
+def test_tiered_keys_plain_list_when_no_user_keys():
+    # No BYO key supplied -- the common, platform-only path keeps its
+    # original flat-list shape rather than always wrapping in tuples.
+    assert _tiered_keys(None, ["p1", "p2"]) == ["p1", "p2"]
+
+
+def test_tiered_keys_empty_when_nothing_configured():
+    assert _tiered_keys(None, None) == []
 
 
 # ---------------------------------------------------------------------------
