@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getQueries, getQueryStats } from "@/lib/supabase/services";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
+import { isDemoMode } from "@/lib/demoMode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Demo mode has no real session, so every request here would otherwise 401
+// -- the Analytics page would look broken rather than just empty. There's
+// no real query history to show in demo mode anyway, so return the same
+// zeroed-out shape the real handler below naturally produces for an account
+// with zero rows, rather than duplicating its aggregation logic.
+const EMPTY_ANALYTICS = {
+  overview: [],
+  modelPerformance: [],
+  usageByProvider: [],
+  hourlyData: Array.from({ length: 24 }, (_, hour) => ({ hour: `${hour.toString().padStart(2, "0")}:00`, queries: 0 })),
+  totals: { totalQueries: 0, avgAccuracy: 0, totalCarbonSaved: 0, avgLatencyMs: 0 },
+};
+
 export async function GET(req: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json(EMPTY_ANALYTICS);
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

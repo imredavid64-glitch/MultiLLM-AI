@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { getClientProject, deleteClientProject } from "@/lib/supabase/services";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
+import { isDemoMode } from "@/lib/demoMode";
+import { demoModeUnavailable } from "@/lib/demoModeApi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  if (isDemoMode()) {
+    return demoModeUnavailable("Deleting client projects");
+  }
+
   const params = await props.params;
   const userId = await getAuthenticatedUserId();
   if (!userId) {

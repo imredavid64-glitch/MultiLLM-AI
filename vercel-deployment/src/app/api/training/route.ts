@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 import { createTrainingJob, getTrainingJobs, updateTrainingJob } from "@/lib/supabase/services";
 import registry from "@/lib/model-registry.json";
+import { isDemoMode } from "@/lib/demoMode";
+import { demoModeUnavailable } from "@/lib/demoModeApi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,6 +66,12 @@ const registryModels = [
 ];
 
 export async function GET() {
+  if (isDemoMode()) {
+    // models/corpus are static registry data, not user-specific -- fine to
+    // show for real in demo mode. Only the per-user jobs list is empty.
+    return NextResponse.json({ jobs: [], models: registryModels, corpus: registry.corpus ?? { docs: 0, chars: 0 } });
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -95,6 +103,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (isDemoMode()) {
+    return demoModeUnavailable("Starting training jobs");
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

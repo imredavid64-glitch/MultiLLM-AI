@@ -64,16 +64,16 @@ export default function ApiKeysPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newKeyName, tier: newKeyTier }),
       });
-      if (!res.ok) throw new Error("Request failed");
-      const created = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Request failed");
 
-      setRevealedKey(created.key);
+      setRevealedKey(data.key);
       setShowCreateModal(false);
       setNewKeyName("");
       toast.success("API key created! Save it now - you won't see it again.");
       await loadKeys();
-    } catch {
-      toast.error("Failed to create API key");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create API key");
     }
   };
 

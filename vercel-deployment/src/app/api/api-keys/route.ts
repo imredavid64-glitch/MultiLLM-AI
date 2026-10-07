@@ -7,6 +7,8 @@ import {
 } from "@/lib/supabase/services";
 import { hashApiKey, KEY_PREFIX_LENGTH } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
+import { isDemoMode } from "@/lib/demoMode";
+import { demoModeUnavailable } from "@/lib/demoModeApi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +22,10 @@ function generatePlatformKey(tier: Tier): string {
 }
 
 export async function GET(req: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json({ keys: [] });
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -40,6 +46,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (isDemoMode()) {
+    return demoModeUnavailable("Generating platform API keys");
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

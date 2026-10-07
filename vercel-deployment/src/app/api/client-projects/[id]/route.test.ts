@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getAuthenticatedUserId: vi.fn(),
   getClientProject: vi.fn(),
   deleteClientProject: vi.fn(),
+  isDemoMode: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/serverAuth", () => ({
@@ -12,6 +13,9 @@ vi.mock("@/lib/supabase/serverAuth", () => ({
 vi.mock("@/lib/supabase/services", () => ({
   getClientProject: mocks.getClientProject,
   deleteClientProject: mocks.deleteClientProject,
+}));
+vi.mock("@/lib/demoMode", () => ({
+  isDemoMode: mocks.isDemoMode,
 }));
 
 import { DELETE } from "./route";
@@ -23,6 +27,16 @@ function params(id: string) {
 describe("DELETE /api/client-projects/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isDemoMode.mockReturnValue(false);
+  });
+
+  it("refuses to delete a client project in demo mode", async () => {
+    mocks.isDemoMode.mockReturnValue(true);
+
+    const res = await DELETE(new Request("http://localhost/api/client-projects/p1"), params("p1"));
+
+    expect(res.status).toBe(403);
+    expect(mocks.getAuthenticatedUserId).not.toHaveBeenCalled();
   });
 
   it("requires authentication", async () => {

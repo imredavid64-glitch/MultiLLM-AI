@@ -7,11 +7,19 @@ import {
   CLIENT_PROJECT_LIMITS,
 } from "@/lib/supabase/services";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
+import { isDemoMode } from "@/lib/demoMode";
+import { demoModeUnavailable } from "@/lib/demoModeApi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (isDemoMode()) {
+    // Matches the fake "pro" demo account shown elsewhere (AuthProvider's
+    // demoUser()) rather than defaulting to the free-tier limit.
+    return NextResponse.json({ projects: [], limit: CLIENT_PROJECT_LIMITS.pro, plan: "pro" });
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -29,6 +37,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (isDemoMode()) {
+    return demoModeUnavailable("Creating client projects");
+  }
+
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

@@ -16,7 +16,7 @@ import DashboardHeader from "@/components/layout/dashboard-header";
 // deletion, and this page's own editing flow are the only parts of
 // Profile/Security that do anything real.
 export default function SettingsPage() {
-  const { user, refreshUser, updateProfile, logout } = useAuth();
+  const { user, demoMode, refreshUser, updateProfile, logout } = useAuth();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.user_metadata?.name || user?.profile?.name || "");
@@ -57,10 +57,15 @@ export default function SettingsPage() {
     }
     setDeletingAccount(true);
     try {
-      const res = await fetch("/api/account", { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to delete account");
+      // Demo mode has no real account to delete -- there's no backend
+      // session for /api/account to even authenticate (it would 401).
+      // Logging out of the local fake account achieves the same outcome.
+      if (!demoMode) {
+        const res = await fetch("/api/account", { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to delete account");
+        }
       }
       await logout();
       router.push("/");

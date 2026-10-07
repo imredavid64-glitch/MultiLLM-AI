@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
   createPlatformApiKey: vi.fn(),
   getPlatformApiKeys: vi.fn(),
+  isDemoMode: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/serverAuth", () => ({
@@ -15,6 +16,9 @@ vi.mock("@/lib/supabase/services", () => ({
   getProfile: mocks.getProfile,
   createPlatformApiKey: mocks.createPlatformApiKey,
   getPlatformApiKeys: mocks.getPlatformApiKeys,
+}));
+vi.mock("@/lib/demoMode", () => ({
+  isDemoMode: mocks.isDemoMode,
 }));
 
 import { POST } from "./route";
@@ -31,6 +35,16 @@ describe("POST /api/api-keys", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAuthenticatedUserId.mockResolvedValue("user-1");
+    mocks.isDemoMode.mockReturnValue(false);
+  });
+
+  it("refuses to generate a key in demo mode", async () => {
+    mocks.isDemoMode.mockReturnValue(true);
+
+    const res = await POST(postRequest({ name: "Key", tier: "free" }));
+
+    expect(res.status).toBe(403);
+    expect(mocks.getAuthenticatedUserId).not.toHaveBeenCalled();
   });
 
   it("rejects a free-plan account requesting an enterprise-tier key, even calling the API directly", async () => {

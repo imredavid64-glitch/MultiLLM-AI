@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   countActiveClientProjects: vi.fn(),
   createClientProject: vi.fn(),
   getClientProjects: vi.fn(),
+  isDemoMode: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/serverAuth", () => ({
@@ -18,6 +19,9 @@ vi.mock("@/lib/supabase/services", () => ({
   createClientProject: mocks.createClientProject,
   getClientProjects: mocks.getClientProjects,
   CLIENT_PROJECT_LIMITS: { free: 1, pro: 5, enterprise: Infinity },
+}));
+vi.mock("@/lib/demoMode", () => ({
+  isDemoMode: mocks.isDemoMode,
 }));
 
 import { POST } from "./route";
@@ -34,6 +38,16 @@ describe("POST /api/client-projects", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAuthenticatedUserId.mockResolvedValue("user-1");
+    mocks.isDemoMode.mockReturnValue(false);
+  });
+
+  it("refuses to create a client project in demo mode", async () => {
+    mocks.isDemoMode.mockReturnValue(true);
+
+    const res = await POST(postRequest({ name: "Acme" }));
+
+    expect(res.status).toBe(403);
+    expect(mocks.getAuthenticatedUserId).not.toHaveBeenCalled();
   });
 
   it("rejects creation once the plan's client-project limit is reached", async () => {
