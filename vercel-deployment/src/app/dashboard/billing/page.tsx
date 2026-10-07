@@ -9,12 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/layout/dashboard-header";
 import { getSupabase } from "@/lib/supabase/client";
 import { CONTACT_EMAIL } from "@/lib/contact";
-
-const SUBSCRIPTION_TIERS: Array<{ id: "free" | "pro" | "enterprise"; name: string; price: number; queriesPerMonth: number; rateLimit: number }> = [
-  { id: "free", name: "Free", price: 0, queriesPerMonth: 100, rateLimit: 10 },
-  { id: "pro", name: "Pro", price: 29, queriesPerMonth: 10000, rateLimit: 100 },
-  { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
-];
+import { TIERS as SUBSCRIPTION_TIERS, formatPrice } from "@/lib/pricing";
 
 // Billing has no payment processor at all -- every plan change (upgrade,
 // downgrade, cancellation) is a manual request that goes to a real person by
@@ -174,23 +169,17 @@ export default function BillingPage() {
                 </h2>
 
                 <div className="text-center py-4">
-                  {planLimit === -1 ? (
-                    <p className="text-slate-600">Unlimited queries on the Enterprise plan</p>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-                      <p className="text-slate-600 mb-4">{planLimit.toLocaleString()} queries / month</p>
-                      <div className="w-full bg-slate-200 rounded-full h-2">
-                        <div
-                          className="bg-purple-600 h-2 rounded-full"
-                          style={{ width: `${Math.min((credits / planLimit) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-sm text-slate-500 mt-2">
-                        {credits.toLocaleString()} / {planLimit.toLocaleString()} credits remaining
-                      </p>
-                    </>
-                  )}
+                  <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                  <p className="text-slate-600 mb-4">{planLimit.toLocaleString()} queries / month</p>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full"
+                      style={{ width: `${Math.min((credits / planLimit) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-slate-500 mt-2">
+                    {credits.toLocaleString()} / {planLimit.toLocaleString()} credits remaining
+                  </p>
                 </div>
               </motion.div>
             </motion.div>
@@ -226,24 +215,18 @@ export default function BillingPage() {
                       <div className="text-center mb-6">
                         <h3 className="text-2xl font-bold text-slate-900">{tier.name}</h3>
                         <div className="flex items-center justify-center gap-1 mt-2">
-                          <span className="text-3xl font-bold text-slate-900">${tier.price}</span>
+                          <span className="text-3xl font-bold text-slate-900">{formatPrice(tier.price)}</span>
                           <span className="text-slate-500">/month</span>
                         </div>
                       </div>
 
                       <ul className="space-y-3 mb-6">
-                        <li className="flex items-center gap-2 text-sm text-slate-600">
-                          <span className="w-5 h-5 text-purple-600">✓</span>
-                          {tier.queriesPerMonth === -1 ? "Unlimited queries/month" : `${tier.queriesPerMonth.toLocaleString()} queries/month`}
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-slate-600">
-                          <span className="w-5 h-5 text-purple-600">✓</span>
-                          {tier.rateLimit} requests/minute
-                        </li>
-                        <li className="flex items-center gap-2 text-sm text-slate-600">
-                          <span className="w-5 h-5 text-purple-600">✓</span>
-                          Multiple models available
-                        </li>
+                        {tier.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-sm text-slate-600">
+                            <span className="w-5 h-5 text-purple-600">✓</span>
+                            {feature}
+                          </li>
+                        ))}
                       </ul>
 
                       {tier.id === currentPlan ? (
@@ -264,6 +247,7 @@ export default function BillingPage() {
                     </motion.div>
                   ))}
                 </div>
+                <p className="text-center text-xs text-slate-400 mt-6">Prices exclude VAT.</p>
               </div>
 
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">

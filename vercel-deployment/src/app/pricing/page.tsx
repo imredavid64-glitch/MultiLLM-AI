@@ -3,40 +3,7 @@
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
 import { CONTACT_EMAIL } from "@/lib/contact";
-
-interface Tier {
-  id: "free" | "pro" | "enterprise";
-  name: string;
-  price: number;
-  tagline: string;
-  features: string[];
-  highlighted?: boolean;
-}
-
-const TIERS: Tier[] = [
-  {
-    id: "free",
-    name: "Free",
-    price: 0,
-    tagline: "Try the ensemble, no card required",
-    features: ["100 queries / month", "10 requests/min rate limit", "All providers (BYO key optional)", "Query history & analytics"],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: 29,
-    tagline: "For individuals shipping with it daily",
-    features: ["10,000 queries / month", "100 requests/min rate limit", "Deep Review cross-checking", "Platform API keys", "Priority support"],
-    highlighted: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: 299,
-    tagline: "For teams and agencies at scale",
-    features: ["Unlimited queries", "1,000 requests/min rate limit", "Multi-tenant client projects", "Dedicated onboarding", "Custom contract & DPA"],
-  },
-];
+import { TIERS, formatPrice } from "@/lib/pricing";
 
 const contactMailto = (subject: string) =>
   `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}`;
@@ -68,7 +35,7 @@ export default function PricingPage() {
             <h2 className="text-xl font-semibold text-slate-900">{tier.name}</h2>
             <p className="text-sm text-slate-500 mt-1">{tier.tagline}</p>
             <div className="mt-6 mb-6">
-              <span className="text-4xl font-bold text-slate-900">${tier.price}</span>
+              <span className="text-4xl font-bold text-slate-900">{formatPrice(tier.price)}</span>
               <span className="text-slate-500">/month</span>
             </div>
             <ul className="space-y-3 mb-8 flex-1">
@@ -102,7 +69,9 @@ export default function PricingPage() {
         ))}
       </div>
 
-      <p className="text-center text-sm text-slate-500 mt-12">
+      <p className="text-center text-xs text-slate-400 mt-6">Prices exclude VAT.</p>
+
+      <p className="text-center text-sm text-slate-500 mt-6">
         Already have an account?{" "}
         <Link href="/dashboard/billing" className="text-purple-600 underline">
           Manage your subscription

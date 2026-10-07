@@ -7,12 +7,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/layout/dashboard-header";
-
-const SUBSCRIPTION_TIERS = [
-  { id: "free", name: "Free", price: 0, queriesPerMonth: 100, rateLimit: 10 },
-  { id: "pro", name: "Pro", price: 29, queriesPerMonth: 10000, rateLimit: 100 },
-  { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
-];
+import { TIERS as SUBSCRIPTION_TIERS, formatPrice } from "@/lib/pricing";
 
 const quickActions = [
   { label: "New Ensemble Query", href: "/", icon: Zap, color: "bg-purple-600 hover:bg-purple-700" },
@@ -170,23 +165,17 @@ export default function DashboardPage() {
                   <div className="text-center mb-6">
                     <h3 className="text-2xl font-bold text-slate-900">{tier.name}</h3>
                     <div className="flex items-center justify-center gap-1 mt-2">
-                      <span className="text-4xl font-bold text-slate-900">${tier.price}</span>
+                      <span className="text-4xl font-bold text-slate-900">{formatPrice(tier.price)}</span>
                       <span className="text-slate-500 mt-4">/month</span>
                     </div>
                   </div>
                   <ul className="space-y-3 mb-6">
-                    <li className="flex items-center gap-2 text-slate-600">
-                      <span className="w-5 h-5 text-purple-600">✓</span>
-                      {tier.queriesPerMonth === -1 ? "Unlimited queries/month" : `${tier.queriesPerMonth.toLocaleString()} queries/month`}
-                    </li>
-                    <li className="flex items-center gap-2 text-slate-600">
-                      <span className="w-5 h-5 text-purple-600">✓</span>
-                      {tier.rateLimit} requests/minute
-                    </li>
-                    <li className="flex items-center gap-2 text-slate-600">
-                      <span className="w-5 h-5 text-purple-600">✓</span>
-                      {3} models available
-                    </li>
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-slate-600">
+                        <span className="w-5 h-5 text-purple-600">✓</span>
+                        {feature}
+                      </li>
+                    ))}
                   </ul>
                   <Link
                     href="/dashboard/billing"
@@ -201,6 +190,7 @@ export default function DashboardPage() {
                 </motion.div>
               ))}
             </div>
+            <p className="text-center text-xs text-slate-400 mt-6">Prices exclude VAT.</p>
           </motion.section>
         </main>
       </div>
