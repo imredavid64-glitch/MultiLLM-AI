@@ -27,7 +27,7 @@ train/
   train.py                CLI to train both models (MPS/CPU, no downloads)
 models/                   Trained artifacts (reproducible via train.train)
 knowledge_sources/        Local docs used for retrieval-grounded answers
-vercel-deployment/        Next.js 14 SaaS (dashboard, auth, API keys, billing, analytics, training)
+vercel-deployment/        Next.js 16 SaaS (dashboard, auth, API keys, billing, analytics, training)
 ```
 
 ## Quickstart
@@ -94,9 +94,11 @@ npm install
 npm run dev
 ```
 
-Set `NEXT_PUBLIC_APPWRITE_ENDPOINT` and `NEXT_PUBLIC_APPWRITE_PROJECT_ID` to
-enable real authentication and persistence. Without them, the app runs in
-**demo mode** (localStorage-backed auth) so everything is still testable.
+Copy `vercel-deployment/.env.example` to `.env.local` and set
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+`SUPABASE_SERVICE_ROLE_KEY` to enable real authentication and persistence.
+Without them, the app runs in **demo mode** (localStorage-backed auth) so
+everything is still testable.
 
 ## How the ensemble works
 
