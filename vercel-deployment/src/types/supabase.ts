@@ -10,6 +10,7 @@ export interface Database {
           name: string | null;
           plan: 'free' | 'pro' | 'enterprise';
           credits: number;
+          credits_period_start: string;
           plan_expires_at: string | null;
           is_active: boolean;
           created_at: string;
@@ -21,6 +22,7 @@ export interface Database {
           name?: string | null;
           plan?: 'free' | 'pro' | 'enterprise';
           credits?: number;
+          credits_period_start?: string;
           plan_expires_at?: string | null;
           is_active?: boolean;
           created_at?: string;
@@ -32,6 +34,7 @@ export interface Database {
           name?: string | null;
           plan?: 'free' | 'pro' | 'enterprise';
           credits?: number;
+          credits_period_start?: string;
           plan_expires_at?: string | null;
           is_active?: boolean;
           created_at?: string;

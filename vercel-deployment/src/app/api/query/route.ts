@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { MultiLLM } from "@/lib/multi-llm";
-import { getProfile, decrementCredits, getApiKeys, getClientProject, incrementApiKeyUsage } from "@/lib/supabase/services";
+import { getProfile, consumeCredits, getApiKeys, getClientProject, incrementApiKeyUsage } from "@/lib/supabase/services";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 import { checkRateLimit, getClientIp, type Tier } from "@/lib/rateLimiter";
@@ -153,11 +153,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (profile && profile.credits <= 0) {
-    return NextResponse.json(
-      { error: "Out of credits. Upgrade your plan to continue." },
-      { status: 402 }
-    );
+  // Atomic check-and-decrement: closes a real race in the old flow (a
+  // separate read-then-write decrementCredits() call after the fact) where
+  // two concurrent requests could both pass a stale "credits > 0" read and
+  // both decrement, going negative. Doing this up front -- rather than only
+  // after a successful ensemble call -- means a request that fails
+  // downstream (e.g. the 503 below) still spends the credit; that's a
+  // deliberate trade-off for closing the race, not an oversight.
+  if (userId && profile) {
+    const consumption = await consumeCredits(userId, 1, profile);
+    if (!consumption.success) {
+      return NextResponse.json(
+        { error: "Out of credits. Upgrade your plan to continue." },
+        { status: 402 }
+      );
+    }
   }
 
   // BYO provider keys: if the user has connected their own (encrypted at
@@ -223,7 +233,6 @@ export async function POST(req: NextRequest) {
       sources,
     };
     await supabase.from("queries").insert(queryRecord as any);
-    await decrementCredits(userId, 1);
   }
 
   if (apiKeyAuth) {

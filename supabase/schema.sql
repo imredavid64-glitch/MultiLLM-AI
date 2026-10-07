@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     name TEXT,
     plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
     credits INTEGER NOT NULL DEFAULT 100,
+    -- Start of the current monthly credit period, used for a lazy reset (no
+    -- cron) on the next query -- see decrement_credits_atomic /
+    -- reset_credits_period below and src/lib/credits.ts's decideCreditReset.
+    credits_period_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     plan_expires_at TIMESTAMPTZ,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -74,6 +78,12 @@ CREATE TABLE IF NOT EXISTS public.training_jobs (
 -- there) and backfills a pre-existing table on an already-provisioned project.
 ALTER TABLE public.training_jobs ADD COLUMN IF NOT EXISTS learning_rate DOUBLE PRECISION NOT NULL DEFAULT 0.003;
 ALTER TABLE public.training_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Same: covers a fresh CREATE TABLE above (no-op there) and backfills an
+-- already-provisioned profiles table. Existing rows get NOW() as their
+-- period start -- they're not granted extra credits immediately, just
+-- enrolled starting today instead of resetting on an unknown past date.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS credits_period_start TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 -- Subscriptions (Stripe)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
@@ -241,6 +251,47 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 REVOKE ALL ON FUNCTION public.increment_platform_api_key_usage(uuid) FROM PUBLIC, anon, authenticated;
+
+-- Credit consumption: a single UPDATE guarded by its own WHERE clause, so
+-- concurrent requests on the same user's credits can never drive the balance
+-- negative (no read-then-write from application code -- the previous
+-- decrementCredits() read credits, then wrote credits - amount in a separate
+-- round trip, which could lose a concurrent decrement). Returns one row with
+-- the new balance on success, or zero rows if there weren't enough credits --
+-- the caller (consumeCredits() in src/lib/supabase/services.ts) treats an
+-- empty result as "insufficient credits" and never goes negative.
+--
+-- This function does NOT handle the monthly reset -- the "is a reset due"
+-- decision lives in TypeScript (src/lib/credits.ts's decideCreditReset),
+-- not here, specifically so it's unit-testable; this repo's Vitest suite
+-- never hits a real database, so logic buried only in PL/pgSQL can't be
+-- exercised by a test at all. See reset_credits_period below for the other
+-- half, which consumeCredits() calls first when a reset is due.
+CREATE OR REPLACE FUNCTION public.decrement_credits_atomic(p_user_id uuid, p_amount int)
+RETURNS TABLE(remaining_credits int) AS $$
+    UPDATE public.profiles
+       SET credits = credits - p_amount
+     WHERE id = p_user_id AND credits >= p_amount
+    RETURNING credits;
+$$ LANGUAGE sql SET search_path = public, pg_temp;
+REVOKE ALL ON FUNCTION public.decrement_credits_atomic(uuid, int) FROM PUBLIC, anon, authenticated;
+
+-- Starts a new monthly credit period with the given allowance. Guarded by
+-- p_expected_period_start (the value TypeScript observed when it decided a
+-- reset was due) so a second concurrent caller that made the same decision
+-- from the same stale read can't re-apply the reset a moment later and
+-- re-grant a full allowance on top of what the first caller already
+-- consumed -- its UPDATE simply matches zero rows and is a no-op. Never
+-- called for demo/trial accounts (plan_expires_at IS NOT NULL) -- see
+-- decideCreditReset, which refuses to schedule a reset for those regardless
+-- of how old their period is.
+CREATE OR REPLACE FUNCTION public.reset_credits_period(p_user_id uuid, p_new_credits int, p_expected_period_start timestamptz)
+RETURNS void AS $$
+    UPDATE public.profiles
+       SET credits = p_new_credits, credits_period_start = now()
+     WHERE id = p_user_id AND credits_period_start = p_expected_period_start;
+$$ LANGUAGE sql SET search_path = public, pg_temp;
+REVOKE ALL ON FUNCTION public.reset_credits_period(uuid, int, timestamptz) FROM PUBLIC, anon, authenticated;
 
 -- Multi-tenant client project tracking: an agency user creates one row per
 -- end-client they serve, and queries can be tagged against a project so

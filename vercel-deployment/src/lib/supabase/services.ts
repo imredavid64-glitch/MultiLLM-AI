@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/client';
 import type { Database } from '@/types/supabase';
+import { decideCreditReset } from '@/lib/credits';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ApiKey = Database['public']['Tables']['api_keys']['Row'];
@@ -39,11 +40,40 @@ export async function incrementCredits(userId: string, amount: number): Promise<
   return updateProfile(userId, { credits: profile.credits + amount });
 }
 
-export async function decrementCredits(userId: string, amount: number): Promise<Profile | null> {
-  const profile = await getProfile(userId);
-  if (!profile) return null;
-  const newCredits = Math.max(0, profile.credits - amount);
-  return updateProfile(userId, { credits: newCredits });
+export type ConsumeCreditsResult = { success: true; remainingCredits: number } | { success: false };
+
+/**
+ * Atomically consumes `amount` credits for a user, lazily rolling the
+ * account over to a fresh monthly allowance first if one is due (see
+ * decideCreditReset). `profile` must be a fresh-enough read of the caller's
+ * own profile (callers that already fetched it for other checks in the same
+ * request should pass that same object rather than fetching it again).
+ *
+ * The decrement itself is a single atomic SQL statement (decrement_credits_atomic)
+ * guarded by its own WHERE clause -- it cannot go negative under concurrency,
+ * unlike the old decrementCredits()'s separate read-then-write.
+ */
+export async function consumeCredits(userId: string, amount: number, profile: Profile): Promise<ConsumeCreditsResult> {
+  const decision = decideCreditReset({
+    plan: profile.plan,
+    creditsPeriodStart: profile.credits_period_start,
+    isDemoAccount: profile.plan_expires_at !== null,
+  });
+
+  if (decision.shouldReset) {
+    await supabaseServer.rpc('reset_credits_period', {
+      p_user_id: userId,
+      p_new_credits: decision.newAllowance,
+      p_expected_period_start: profile.credits_period_start,
+    });
+  }
+
+  const { data, error } = await supabaseServer.rpc('decrement_credits_atomic', {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+  if (error || !data?.length) return { success: false };
+  return { success: true, remainingCredits: data[0].remaining_credits };
 }
 
 // API Key operations

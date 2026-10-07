@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAuthenticatedUserId: vi.fn(),
   authenticateApiKey: vi.fn(),
   getProfile: vi.fn(),
-  decrementCredits: vi.fn(),
+  consumeCredits: vi.fn(),
   getApiKeys: vi.fn(),
   getClientProject: vi.fn(),
   incrementApiKeyUsage: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock("@/lib/apiKeyAuth", () => ({
 }));
 vi.mock("@/lib/supabase/services", () => ({
   getProfile: mocks.getProfile,
-  decrementCredits: mocks.decrementCredits,
+  consumeCredits: mocks.consumeCredits,
   getApiKeys: mocks.getApiKeys,
   getClientProject: mocks.getClientProject,
   incrementApiKeyUsage: mocks.incrementApiKeyUsage,
@@ -48,6 +48,7 @@ const BASE_PROFILE = {
   name: "Test User",
   plan: "free" as const,
   credits: 100,
+  credits_period_start: "2026-01-01T00:00:00Z",
   plan_expires_at: null as string | null,
   is_active: true,
   created_at: "2026-01-01T00:00:00Z",
@@ -70,7 +71,7 @@ describe("POST /api/query", () => {
     mocks.getProfile.mockResolvedValue({ ...BASE_PROFILE });
     mocks.getApiKeys.mockResolvedValue([]);
     mocks.getClientProject.mockResolvedValue(null);
-    mocks.decrementCredits.mockResolvedValue(undefined);
+    mocks.consumeCredits.mockResolvedValue({ success: true, remainingCredits: 99 });
     mocks.getClientIp.mockReturnValue("127.0.0.1");
     mocks.checkRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
   });
@@ -122,12 +123,15 @@ describe("POST /api/query", () => {
     expect(json.error).toMatch(/expired/i);
   });
 
-  it("rejects a request when credits are exhausted", async () => {
-    mocks.getProfile.mockResolvedValue({ ...BASE_PROFILE, credits: 0 });
-    vi.stubGlobal("fetch", vi.fn());
+  it("rejects a request when consumeCredits reports insufficient credits, without calling the ensemble", async () => {
+    mocks.consumeCredits.mockResolvedValue({ success: false });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
 
     const res = await POST(postRequest({ prompt: "hello" }));
+
     expect(res.status).toBe(402);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("returns 429 with a Retry-After header when rate limited", async () => {
@@ -152,7 +156,7 @@ describe("POST /api/query", () => {
     expect(json.error).toMatch(/sign up/i);
   });
 
-  it("returns a real answer and decrements credits on a successful ensemble response", async () => {
+  it("returns a real answer and consumes a credit on a successful ensemble response", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -173,6 +177,15 @@ describe("POST /api/query", () => {
     expect(res.status).toBe(200);
     expect(json.answer).toBe("The answer.");
     expect(json._source).toBe("python-ensemble");
-    expect(mocks.decrementCredits).toHaveBeenCalledWith("user-1", 1);
+    expect(mocks.consumeCredits).toHaveBeenCalledWith("user-1", 1, expect.objectContaining({ id: "user-1" }));
+  });
+
+  it("still consumes a credit even when the ensemble call then fails (credit is spent up front, atomically, before the call)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")));
+
+    const res = await POST(postRequest({ prompt: "hello" }));
+
+    expect(res.status).toBe(503);
+    expect(mocks.consumeCredits).toHaveBeenCalledWith("user-1", 1, expect.objectContaining({ id: "user-1" }));
   });
 });
