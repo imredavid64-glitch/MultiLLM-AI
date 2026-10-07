@@ -122,6 +122,49 @@ jobs:
           curl -f http://localhost:8000/api/health
           kill %1
 
+  # vercel-deployment/api/query-ensemble/{ai_client,local_models,token_optimizer}.py
+  # are manually-maintained vendored copies of the repo-root originals (see
+  # "VENDORED COPY" comment at the top of each) -- Vercel's Root Directory
+  # for this project can't reach files above it. Nothing enforces the two
+  # staying in sync, so a copy can silently drift. Catch that here instead
+  # of in production.
+  vendored-files-check:
+    name: Vendored Files In Sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Diff vendored copies against their repo-root originals
+        run: |
+          set -e
+          # The vendored copy's header isn't a clean, identically-styled
+          # block across files: ai_client.py prepends plain "#" comment
+          # lines (clean prefix), but local_models.py/token_optimizer.py
+          # splice extra lines into the leading docstring, which moves the
+          # opening `"""` onto its own line -- the first real content line
+          # is otherwise identical but differs by that one quote mark.
+          # Compare by length (vendored should be exactly the root file's
+          # header longer, its last N lines = root's N lines) and strip `"`
+          # before diffing so that one-character docstring-reflow quirk
+          # doesn't count as drift, while any real content change (which
+          # would still differ character-for-character elsewhere) still
+          # fails the build.
+          check_vendored() {
+            local root_file="$1" vendored_file="$2"
+            local root_lines
+            root_lines=$(wc -l < "$root_file")
+            if ! diff -q <(tr -d '"' < "$root_file") <(tail -n "$root_lines" "$vendored_file" | tr -d '"') > /dev/null; then
+              echo "::error::$vendored_file has diverged from $root_file beyond its VENDORED COPY header. Re-sync it manually."
+              diff "$root_file" <(tail -n "$root_lines" "$vendored_file") || true
+              exit 1
+            fi
+            echo "OK: $vendored_file's last $root_lines lines match $root_file."
+          }
+
+          check_vendored ai_client.py vercel-deployment/api/query-ensemble/ai_client.py
+          check_vendored local_models.py vercel-deployment/api/query-ensemble/local_models.py
+          check_vendored token_optimizer.py vercel-deployment/api/query-ensemble/token_optimizer.py
+
   # Training function tests: skipped. training-job is excluded from
   # deployment (vercel-deployment/training-job-disabled/, not under api/ --
   # see its DISABLED.md), so there's nothing deployed here to test, and the
@@ -208,7 +251,7 @@ jobs:
   # Notify on failure
   notify-failure:
     name: Notify on Failure
-    needs: [python-test, nextjs-build, python-functions-test, security-scan, secret-scan]
+    needs: [python-test, nextjs-build, python-functions-test, vendored-files-check, security-scan, secret-scan]
     if: failure()
     runs-on: ubuntu-latest
     steps:
