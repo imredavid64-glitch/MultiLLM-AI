@@ -212,7 +212,7 @@ this is a recommendation, not a migration.
 | `ENCRYPTION_KEY` | Yes | 32-byte base64 key for API encryption |
 | `INTERNAL_API_SECRET` | Yes | Shared secret Next.js sends to the Python functions |
 | `APP_ORIGIN` | Yes | Deployed app origin; CORS allow-list for the query-ensemble function |
-| `PYTHON_TRAINING_URL` | Yes | URL of the deployed training-job Python function |
+| `PYTHON_TRAINING_URL` | No (currently unused) | URL of the deployed training-job Python function -- leave unset; `training-job` is disabled in production, see the Known Gap note above |
 | `OPENAI_API_KEY` | No | OpenAI/OpenRouter API key |
 | `GEMINI_API_KEY` | No | Google Gemini API key |
 | `MISTRAL_API_KEY` | No | Mistral API key |

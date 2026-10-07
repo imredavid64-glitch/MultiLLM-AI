@@ -418,7 +418,7 @@ export default function HomePage() {
         </a>
         <p className="text-sm text-slate-500 mt-4">
           Free to try, no account needed. Looking at Pro or Enterprise?{" "}
-          <a href="/dashboard/billing" className="text-purple-600 underline">Talk to us</a>.
+          <a href="/pricing" className="text-purple-600 underline">See pricing</a>.
         </p>
       </section>
     </div>
