@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/layout/dashboard-header";
 import { getSupabase } from "@/lib/supabase/client";
+import { CONTACT_EMAIL } from "@/lib/contact";
 
 const SUBSCRIPTION_TIERS: Array<{ id: "free" | "pro" | "enterprise"; name: string; price: number; queriesPerMonth: number; rateLimit: number }> = [
   { id: "free", name: "Free", price: 0, queriesPerMonth: 100, rateLimit: 10 },
@@ -17,8 +18,7 @@ const SUBSCRIPTION_TIERS: Array<{ id: "free" | "pro" | "enterprise"; name: strin
 
 // Billing has no payment processor at all -- every plan change (upgrade,
 // downgrade, cancellation) is a manual request that goes to a real person by
-// email. Set this to a real inbox before launch.
-const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sales@example.com";
+// email.
 const contactMailto = (subject: string, body: string) =>
   `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 

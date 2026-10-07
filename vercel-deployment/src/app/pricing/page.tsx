@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
-
-// Mirrors vercel-deployment/src/app/dashboard/billing/page.tsx's SUBSCRIPTION_TIERS.
-// Keep the two in sync if pricing changes.
-const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sales@example.com";
+import { CONTACT_EMAIL } from "@/lib/contact";
 
 interface Tier {
   id: "free" | "pro" | "enterprise";

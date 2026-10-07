@@ -1,3 +1,16 @@
+// NEXT_PUBLIC_CONTACT_EMAIL backs every billing/pricing mailto CTA and the
+// footer -- there is no payment processor, so this address is the entire
+// upgrade/downgrade/cancellation/support path. Shipping a real production
+// deploy without it set (previously silently falling back to
+// "sales@example.com") means those links go nowhere real. Only a genuine
+// Vercel production build is blocked here -- CI, local dev, and preview
+// deploys don't set VERCEL_ENV=production, so they're unaffected.
+if (process.env.VERCEL_ENV === "production" && !process.env.NEXT_PUBLIC_CONTACT_EMAIL) {
+  throw new Error(
+    "NEXT_PUBLIC_CONTACT_EMAIL must be set for a production build -- it's the only contact path for billing (no payment processor). Set it in the Vercel project's production environment variables."
+  );
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

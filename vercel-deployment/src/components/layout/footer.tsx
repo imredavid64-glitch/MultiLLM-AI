@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-
-const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sales@example.com";
+import { CONTACT_EMAIL } from "@/lib/contact";
 
 export default function Footer() {
   return (
