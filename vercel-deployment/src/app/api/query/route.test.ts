@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn(),
   getClientIp: vi.fn(),
   decryptApiKey: vi.fn(),
+  isDemoMode: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/serverAuth", () => ({
@@ -38,6 +39,9 @@ vi.mock("@/lib/rateLimiter", () => ({
 }));
 vi.mock("@/lib/encryption", () => ({
   decryptApiKey: mocks.decryptApiKey,
+}));
+vi.mock("@/lib/demoMode", () => ({
+  isDemoMode: mocks.isDemoMode,
 }));
 
 import { POST } from "./route";
@@ -74,6 +78,7 @@ describe("POST /api/query", () => {
     mocks.consumeCredits.mockResolvedValue({ success: true, remainingCredits: 99 });
     mocks.getClientIp.mockReturnValue("127.0.0.1");
     mocks.checkRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
+    mocks.isDemoMode.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -142,6 +147,34 @@ describe("POST /api/query", () => {
 
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("42");
+  });
+
+  it("treats demo-mode requests as pro-tier (rate limit + Deep Review), scoped per-IP", async () => {
+    mocks.isDemoMode.mockReturnValue(true);
+    mocks.getAuthenticatedUserId.mockResolvedValue(null);
+    mocks.getClientIp.mockReturnValue("198.51.100.7");
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        answer: "The answer.",
+        candidates: [{ provider_name: "openai", model: "gpt-4o-mini" }],
+        sources: [],
+        metrics: { top_score: 0.9, latency_ms: 1200 },
+        providers_used: ["openai"],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await POST(postRequest({ prompt: "hello", deep_review: true }));
+
+    expect(res.status).toBe(200);
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: "pro", identityKey: "demo:198.51.100.7" })
+    );
+    const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(sentBody.deep_review).toBe(true);
+    // No real session -- credits are never touched in demo mode.
+    expect(mocks.consumeCredits).not.toHaveBeenCalled();
   });
 
   it("suggests signing up when the anonymous global daily cap is hit", async () => {

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
+import { isDemoMode } from "@/lib/demoMode";
 
 interface Profile {
   id: string;
@@ -71,10 +72,6 @@ function loadDemoUser(): (User & { profile: Profile }) | null {
   } catch {
     return null;
   }
-}
-
-function isDemoMode(): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }
 
 function getSupabase() {

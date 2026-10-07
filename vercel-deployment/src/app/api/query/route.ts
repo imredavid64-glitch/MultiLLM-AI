@@ -6,6 +6,7 @@ import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 import { checkRateLimit, getClientIp, type Tier } from "@/lib/rateLimiter";
 import { decryptApiKey } from "@/lib/encryption";
+import { isDemoMode } from "@/lib/demoMode";
 
 /**
  * Loads the user's own BYO provider keys (if any), decrypted server-side
@@ -122,9 +123,24 @@ export async function POST(req: NextRequest) {
 
   const profile = userId ? await getProfile(userId) : null;
 
-  const tier: Tier = (apiKeyAuth?.tier as Tier) || (profile?.plan as Tier) || "free";
-  const deepReviewAllowed = requestedDeepReview && DEEP_REVIEW_PLANS.has(profile?.plan || "free");
-  const identityKey = apiKeyAuth ? `key:${apiKeyAuth.keyId}` : userId ? `user:${userId}` : undefined;
+  // Demo mode (no Supabase configured) has no real session at all -- every
+  // request looks anonymous to this route by default (no userId, no
+  // profile), even though the dashboard shows a fake "Pro, 10,000 credits"
+  // account. Without this, a demo visitor gets rate-limited at the strict
+  // anonymous 3/min and sees Deep Review locked behind "Upgrade to enable",
+  // contradicting what they're shown -- treat demo traffic as pro-tier
+  // instead, scoped per-IP (not a global shared bucket) since there's no
+  // real per-user identity to key on.
+  const demoMode = isDemoMode();
+  const tier: Tier = (apiKeyAuth?.tier as Tier) || (profile?.plan as Tier) || (demoMode ? "pro" : "free");
+  const deepReviewAllowed = requestedDeepReview && (demoMode || DEEP_REVIEW_PLANS.has(profile?.plan || "free"));
+  const identityKey = apiKeyAuth
+    ? `key:${apiKeyAuth.keyId}`
+    : userId
+      ? `user:${userId}`
+      : demoMode
+        ? `demo:${getClientIp(req)}`
+        : undefined;
   const rateLimit = await checkRateLimit({ ip: getClientIp(req), identityKey, tier });
   if (!rateLimit.allowed) {
     const message =
