@@ -1,53 +1,28 @@
 "use client";
 
-import { useState, useRef, ChangeEvent, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Save, Upload, User, Shield, CreditCard, Bell, Globe, Languages, Camera, Check, X, AlertTriangle } from "lucide-react";
+import { Save, User, Shield, Bell, Check, X, AlertTriangle } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/layout/dashboard-header";
 
-const avatarOptions = [
-  { id: "1", name: "Alex", color: "bg-purple-400", emoji: "🧑‍💻" },
-  { id: "2", name: "Sam", color: "bg-blue-400", emoji: "👨‍💼" },
-  { id: "3", name: "Jordan", color: "bg-emerald-400", emoji: "👩‍🎨" },
-  { id: "4", name: "Taylor", color: "bg-orange-400", emoji: "👨‍🔬" },
-  { id: "5", name: "Casey", color: "bg-rose-400", emoji: "👩‍🚀" },
-];
-
+// Avatar picker, phone number, photo upload, and the whole Preferences
+// section (language/timezone/notifications) were removed from here --
+// none of them persisted anywhere, they just silently reset on reload.
+// Only re-add a control once it actually saves. Display Name, account
+// deletion, and this page's own editing flow are the only parts of
+// Profile/Security that do anything real.
 export default function SettingsPage() {
   const { user, refreshUser, updateProfile, logout } = useAuth();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user?.user_metadata?.name || user?.profile?.name || "");
-  const [selectedAvatar, setSelectedAvatar] = useState(user?.user_metadata?.name?.split(" ")[0] || user?.profile?.name?.split(" ")[0] || "Alex");
-  const [phone, setPhone] = useState("");
-  const [language, setLanguage] = useState("en");
-  const [timezone, setTimezone] = useState("UTC-8");
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    modelUpdates: true,
-    billing: true,
-  });
   const [saveStatus, setSaveStatus] = useState("idle");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAvatarSelect = (avatarName: string) => {
-    setSelectedAvatar(avatarName);
-  };
-
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    // Selection is accepted but not uploaded anywhere -- no storage backend
-    // is wired up yet. See the disclaimer rendered next to this control.
-    if (e.target.files?.[0]) {
-      toast("Profile pictures aren't supported yet.");
-    }
-  };
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
@@ -73,16 +48,6 @@ export default function SettingsPage() {
 
   const handleCancel = () => {
     setDisplayName(user?.user_metadata?.name || user?.profile?.name || "");
-    setPhone("");
-    setLanguage("en");
-    setTimezone("UTC-8");
-    setTwoFactorEnabled(false);
-    setNotifications({
-      email: true,
-      push: false,
-      modelUpdates: true,
-      billing: true,
-    });
     setIsEditing(false);
   };
 
@@ -177,37 +142,18 @@ export default function SettingsPage() {
                 Profile
               </h2>
               <form className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2">
-                    <label htmlFor="displayName" className="block text-sm font-medium text-slate-700 mb-1">
-                      Display Name
-                    </label>
-                    <input
-                      id="displayName"
-                      type="text"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-3">
-                      Avatar <span className="font-normal text-slate-400">(not saved yet)</span>
-                    </label>
-                    <div className="flex gap-2">
-                      {avatarOptions.map((avatar) => (
-                        <button
-                          key={avatar.id}
-                          type="button"
-                          onClick={() => handleAvatarSelect(avatar.name)}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-semibold transition-all ${avatar.color} ${avatar.name === selectedAvatar ? "ring-2 ring-purple-600 ring-offset-2" : "hover:scale-110"}`}
-                        >
-                          {avatar.emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div>
+                  <label htmlFor="displayName" className="block text-sm font-medium text-slate-700 mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    id="displayName"
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    disabled={!isEditing}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                  />
                 </div>
 
                 <div>
@@ -223,132 +169,6 @@ export default function SettingsPage() {
                   />
                   <p className="text-xs text-slate-400 mt-1">Changing your account email isn&apos;t supported yet.</p>
                 </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
-                    Phone Number <span className="font-normal text-slate-400">(not saved yet)</span>
-                  </label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="+1 (555) 123-4567"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all disabled:bg-slate-50 disabled:text-slate-500"
-                  />
-                </div>
-
-                <div className="relative">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={!isEditing}
-                    className="w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    <Upload className="w-5 h-5 text-slate-400" />
-                    <span className="text-slate-600">Change Profile Picture</span>
-                  </button>
-                </div>
-
-                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>Avatar, phone number, and profile picture aren&apos;t saved yet -- only Display Name persists. Saving still succeeds; those three fields just reset next time you open this page.</span>
-                </div>
-              </form>
-            </motion.div>
-
-            {/* Preferences Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8"
-            >
-              <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-purple-600" />
-                Preferences
-              </h2>
-              <div className="mb-6 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>These preferences are not saved yet -- changes here won&apos;t persist after you leave the page.</span>
-              </div>
-              <form className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="language" className="block text-sm font-medium text-slate-700 mb-1">
-                      Language
-                    </label>
-                    <select
-                      id="language"
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all disabled:bg-slate-50"
-                    >
-                      <option value="en">English</option>
-                      <option value="es">Spanish</option>
-                      <option value="fr">French</option>
-                      <option value="de">German</option>
-                      <option value="zh">Chinese</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="timezone" className="block text-sm font-medium text-slate-700 mb-1">
-                      Timezone
-                    </label>
-                    <select
-                      id="timezone"
-                      value={timezone}
-                      onChange={(e) => setTimezone(e.target.value)}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all disabled:bg-slate-50"
-                    >
-                      <option value="UTC-8">Pacific Time (UTC-8)</option>
-                      <option value="UTC-5">Eastern Time (UTC-5)</option>
-                      <option value="UTC+0">UTC</option>
-                      <option value="UTC+8">Beijing (UTC+8)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    Notification Preferences
-                  </label>
-                  <div className="space-y-3">
-                    {[
-                      { key: "email", label: "Email notifications", default: true },
-                      { key: "push", label: "Push notifications", default: false },
-                      { key: "modelUpdates", label: "Model updates and news", default: true },
-                      { key: "billing", label: "Billing and subscription alerts", default: true },
-                    ].map((notification) => (
-                      <label key={notification.key} className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={notifications[notification.key as keyof typeof notifications]}
-                          onChange={(e) =>
-                            setNotifications((prev) => ({
-                              ...prev,
-                              [notification.key]: e.target.checked,
-                            }))
-                          }
-                          disabled={!isEditing}
-                          className="w-5 h-5 rounded border-slate-300 text-purple-600 focus:ring-purple-500 focus:ring-2"
-                        />
-                        <span className="text-sm text-slate-700">{notification.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </form>
             </motion.div>
 
@@ -356,7 +176,7 @@ export default function SettingsPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
               className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8"
             >
               <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
