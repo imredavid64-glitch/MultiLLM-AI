@@ -41,7 +41,6 @@ Visit `http://localhost:3000` - works in **demo mode** without Supabase.
 ### Prerequisites
 - **Supabase** project
 - **Vercel** account
-- **Stripe** account (for billing)
 - **GitHub** repository
 
 ### 1. Provision Supabase
@@ -57,13 +56,7 @@ Visit `http://localhost:3000` - works in **demo mode** without Supabase.
 #    - service_role key (secret)
 ```
 
-### 2. Configure Stripe
-1. Create products/prices in Stripe Dashboard
-2. Set the `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` env vars to those price IDs (read by `getPlanFromPriceId()` in `src/app/api/stripe-webhook/route.ts` — not hardcoded in code)
-3. Add webhook endpoint: `https://your-app.vercel.app/api/stripe-webhook`
-4. Subscribe to events: `customer.subscription.*`, `invoice.payment_*`
-
-### 3. Deploy to Vercel
+### 2. Deploy to Vercel
 ```bash
 # Via Vercel CLI
 vercel --prod
@@ -77,16 +70,14 @@ Required Vercel Environment Variables:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-STRIPE_SECRET_KEY
-STRIPE_WEBHOOK_SECRET
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENCRYPTION_KEY
+NEXT_PUBLIC_CONTACT_EMAIL
 OPENAI_API_KEY (optional)
 GEMINI_API_KEY (optional)
 MISTRAL_API_KEY (optional)
 ```
 
-### 4. Generate Encryption Key
+### 3. Generate Encryption Key
 ```bash
 python -c "import secrets, base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
 ```
@@ -97,11 +88,11 @@ Add output as `ENCRYPTION_KEY` in Vercel.
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Next.js App   │────▶│  Supabase        │────▶│  Stripe         │
-│   (Vercel)      │     │  (Auth, DB,      │     │  (Billing)      │
-│                 │     │   Storage,       │     │                 │
-└─────────────────┘     │   Realtime)      │     └─────────────────┘
+┌─────────────────┐     ┌──────────────────┐
+│   Next.js App   │────▶│  Supabase        │
+│   (Vercel)      │     │  (Auth, DB,      │
+│                 │     │   Storage,       │
+└─────────────────┘     │   Realtime)      │
                         └────────┬─────────┘
                                  │
                     ┌────────────┴────────────┐
@@ -129,7 +120,7 @@ Add output as `ENCRYPTION_KEY` in Vercel.
 - **api_keys** - Encrypted user API keys
 - **queries** - Query history with full traceability
 - **training_jobs** - Training job tracking
-- **subscriptions** - Stripe subscription sync
+- **subscriptions** - Plan/subscription state (updated manually, not by a payment processor -- see billing note below)
 
 ### Row Level Security
 All tables have RLS enabled with policies:
@@ -147,14 +138,18 @@ All tables have RLS enabled with policies:
 ### Next.js (Frontend)
 - `POST /api/query` / `GET /api/query` - Run ensemble query (proxies to Python function) / model+health status
 - `GET /api/training` / `POST /api/training` - List / start training jobs (real Supabase-backed, user-scoped)
-- `POST /api/stripe-webhook` - Stripe webhook handler
 - `GET /api/api-keys` / `POST /api/api-keys` - List / create platform API keys
 - `DELETE /api/api-keys/[id]` - Revoke a platform API key
 - `GET /api/analytics` - Query history + usage analytics
 - `GET /api/client-projects` / `POST /api/client-projects` - Multi-tenant client project CRUD
 - `GET /api/account` / `DELETE /api/account` - Account info / delete account
-- `POST /api/checkout` - Create a Stripe Checkout session
-- `POST /api/billing-portal` - Create a Stripe Billing Portal session
+
+**Billing:** there is no payment processor and no billing API route. Every
+plan change (upgrade/downgrade/cancellation) and billing question is a
+`mailto:` link to `NEXT_PUBLIC_CONTACT_EMAIL`, handled manually. The
+`subscriptions` table's `plan`/`status`/`credits_included` columns are
+updated by hand (e.g. via the Supabase dashboard or a script) when a
+request is fulfilled.
 
 ### Python Functions (Vercel)
 `query-ensemble` is deployed as a Vercel **Service** (`vercel-deployment/vercel.json`'s
@@ -185,7 +180,24 @@ platform bug (`ENOENT` on an installed package file, different file each
 deploy attempt) at the final packaging step. Separately, real training runs
 can exceed the Hobby plan's hard 300s function duration cap regardless. See
 `vercel-deployment/training-job-disabled/DISABLED.md` for details and how to
-restore it once resolved (or after upgrading to Pro).
+restore it once resolved (or after upgrading to Pro). The dashboard's
+Training page reflects this honestly (a "Coming soon" state, not a
+silently-broken form) rather than pretending the feature works.
+
+### Known limitations: where should training actually run?
+
+Recommendation: **move `training-job` to a small dedicated host (Railway
+or Fly.io) rather than keep chasing the Vercel large-functions bug.**
+Vercel's serverless model fundamentally isn't a good fit for this specific
+function -- it needs a large ML dependency (`torch`) and can run for
+several minutes, both of which fight the platform's per-function size and
+duration limits by design, not as an incidental bug to route around.
+Railway and Fly.io both run a persistent container with no such
+size/duration ceiling, at a similar hobby-tier price point, and Vercel
+would still front the rest of the app (Next.js + query-ensemble, neither
+of which have this problem) exactly as it does today -- only
+`PYTHON_TRAINING_URL` would point elsewhere. Not attempted this session;
+this is a recommendation, not a migration.
 
 ---
 
@@ -196,16 +208,11 @@ restore it once resolved (or after upgrading to Pro).
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
-| `STRIPE_SECRET_KEY` | Yes | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe webhook signing secret |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe publishable key |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | Yes | Sales/support inbox used in the footer and plan-upgrade mailto links |
-| `STRIPE_PRICE_PRO` | Yes | Stripe price ID for the Pro plan |
-| `STRIPE_PRICE_ENTERPRISE` | Yes | Stripe price ID for the Enterprise plan |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Yes | Sales/support inbox used in the footer and every billing mailto link (there is no payment processor) |
 | `ENCRYPTION_KEY` | Yes | 32-byte base64 key for API encryption |
 | `INTERNAL_API_SECRET` | Yes | Shared secret Next.js sends to the Python functions |
 | `APP_ORIGIN` | Yes | Deployed app origin; CORS allow-list for the query-ensemble function |
-| `PYTHON_TRAINING_URL` | Yes | URL of the deployed training-job Python function |
+| `PYTHON_TRAINING_URL` | No (currently unused) | URL of the deployed training-job Python function -- leave unset; `training-job` is disabled in production, see the Known Gap note above |
 | `OPENAI_API_KEY` | No | OpenAI/OpenRouter API key |
 | `GEMINI_API_KEY` | No | Google Gemini API key |
 | `MISTRAL_API_KEY` | No | Mistral API key |
@@ -213,6 +220,34 @@ restore it once resolved (or after upgrading to Pro).
 | `BOT_COUNT` | No | Parallel bots (default: 4) |
 | `PRIVACY_REDACTION` | No | Enable PII redaction (default: 1) |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Strongly recommended in production | Shared, cross-instance rate limiting; without these, limits are per-serverless-instance only and far weaker under horizontal scaling |
+
+---
+
+## Agency Demo Accounts
+
+To let an agency try the product before signing up for real, provision them
+a temporary account directly (no self-serve signup needed):
+
+```bash
+vercel env pull .env.local   # once, to get NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY locally
+cd vercel-deployment
+node --env-file=.env.local scripts/demo-account.mjs create --email agency@example.com --name "Acme Agency"
+```
+
+Prints a dashboard login (email + generated password) and a platform API
+key, both shown once. Defaults to a `pro`-tier account, 200 credits, and a
+14-day expiry (`--days`, `--credits`, `--tier` override these). Both the
+credit cap and the expiry date are actually enforced in `/api/query` (see
+`profiles.is_active` / `plan_expires_at` checks there) -- not just cosmetic.
+
+To end access before it naturally expires:
+```bash
+node --env-file=.env.local scripts/demo-account.mjs revoke --email agency@example.com
+```
+
+This is a local admin script, not an API route -- nothing about it is
+reachable from the deployed app. It uses only the existing `profiles` and
+`platform_api_keys` tables; no schema changes.
 
 ---
 
@@ -245,11 +280,16 @@ npm run dev
 # Python tests
 pytest
 
-# Next.js tests
-# NOTE: no test suite exists yet (`npm test` is undefined, so CI's
-# `npm test --if-present` currently no-ops). Add one (e.g. Vitest) before
-# relying on this.
+# Next.js tests (Vitest, Node environment -- no jsdom/RTL; these test API
+# route handlers directly, not rendered components. Coverage prioritizes
+# routes with real logic to regress: auth/tier gating and the
+# ensemble-unreachable fallback in /api/query, ownership checks in
+# /api/client-projects[/[id]], tier-bypass in /api/api-keys. Supabase/auth
+# calls are mocked (vi.mock), never hitting a real database.)
 cd vercel-deployment && npm test
+# `npm run test:watch` for interactive/watch mode.
+# Requires Node >=22.12 (vitest 5's minimum) -- CI's NODE_VERSION reflects
+# this; matters for local runs too if your Node is older.
 
 # Linting
 ruff check .           # Python
@@ -269,7 +309,6 @@ cd vercel-deployment && npm run db:generate-types
 
 - **Vercel**: Function logs in Vercel Dashboard
 - **Supabase**: Logs in Supabase Dashboard > Logs
-- **Stripe**: Webhook delivery logs in Stripe Dashboard > Developers > Webhooks
 
 ---
 
@@ -283,9 +322,6 @@ Run `python -m train.train` to generate local models.
 
 ### Supabase connection failed
 Check `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Ensure RLS policies allow the operations.
-
-### Stripe webhook fails
-Verify webhook URL is accessible and `STRIPE_WEBHOOK_SECRET` matches Stripe Dashboard.
 
 ### Python function timeout
 Increase `maxDuration` in `vercel.json` (max 60s for query, 3600s for training).
@@ -306,7 +342,6 @@ Increase `maxDuration` in `vercel.json` (max 60s for query, 3600s for training).
 
 - [ ] `ENCRYPTION_KEY` is 32-byte base64, stored only in secure env
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` only used server-side
-- [ ] Stripe webhook signature verification enabled
 - [ ] API keys encrypted at rest (using `encryption.py`)
 - [ ] PII redaction enabled (`PRIVACY_REDACTION=1`)
 - [ ] HTTPS enforced (Vercel default)

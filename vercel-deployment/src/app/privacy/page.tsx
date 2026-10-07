@@ -2,7 +2,7 @@ import LegalDocument from "@/components/legal/LegalDocument";
 import { readLegalDoc } from "@/lib/legalDocs";
 
 export const metadata = {
-  title: "Privacy Policy - MultiLLM",
+  title: "Privacy Policy",
 };
 
 export default function PrivacyPage() {

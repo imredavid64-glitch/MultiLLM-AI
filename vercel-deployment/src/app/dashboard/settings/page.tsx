@@ -42,14 +42,10 @@ export default function SettingsPage() {
   };
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        // In a real app, upload to cloud storage
-        console.log("File uploaded:", reader.result);
-      };
-      reader.readAsDataURL(file);
+    // Selection is accepted but not uploaded anywhere -- no storage backend
+    // is wired up yet. See the disclaimer rendered next to this control.
+    if (e.target.files?.[0]) {
+      toast("Profile pictures aren't supported yet.");
     }
   };
 
@@ -197,7 +193,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-3">
-                      Avatar
+                      Avatar <span className="font-normal text-slate-400">(not saved yet)</span>
                     </label>
                     <div className="flex gap-2">
                       {avatarOptions.map((avatar) => (
@@ -230,7 +226,7 @@ export default function SettingsPage() {
 
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
-                    Phone Number
+                    Phone Number <span className="font-normal text-slate-400">(not saved yet)</span>
                   </label>
                   <input
                     id="phone"
@@ -260,6 +256,11 @@ export default function SettingsPage() {
                     <Upload className="w-5 h-5 text-slate-400" />
                     <span className="text-slate-600">Change Profile Picture</span>
                   </button>
+                </div>
+
+                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>Avatar, phone number, and profile picture aren&apos;t saved yet -- only Display Name persists. Saving still succeeds; those three fields just reset next time you open this page.</span>
                 </div>
               </form>
             </motion.div>

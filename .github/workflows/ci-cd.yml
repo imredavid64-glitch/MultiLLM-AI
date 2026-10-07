@@ -7,7 +7,10 @@ on:
     branches: [main, master]
 
 env:
-  NODE_VERSION: '20.x'
+  # vitest 5 requires Node >=22.12 at runtime (not just types) -- bumped
+  # from 20.x when the Next.js test suite was added. Next.js 16 itself only
+  # requires >=20.9, so this is driven by the test tooling, not the app.
+  NODE_VERSION: '24.x'
   PYTHON_VERSION: '3.12'
 
 jobs:

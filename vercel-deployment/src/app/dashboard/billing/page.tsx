@@ -15,13 +15,12 @@ const SUBSCRIPTION_TIERS: Array<{ id: "free" | "pro" | "enterprise"; name: strin
   { id: "enterprise", name: "Enterprise", price: 299, queriesPerMonth: -1, rateLimit: 1000 },
 ];
 
-// Billing is handled manually (contact/invoice), not via Stripe self-serve
-// checkout -- set this to a real inbox before launch.
+// Billing has no payment processor at all -- every plan change (upgrade,
+// downgrade, cancellation) is a manual request that goes to a real person by
+// email. Set this to a real inbox before launch.
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sales@example.com";
-const contactMailto = (tierName: string) =>
-  `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`MultiLLM ${tierName} plan`)}&body=${encodeURIComponent(
-    `Hi, I'd like to upgrade to the ${tierName} plan.`
-  )}`;
+const contactMailto = (subject: string, body: string) =>
+  `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
 interface SubscriptionRow {
   plan: "free" | "pro" | "enterprise";
@@ -36,7 +35,6 @@ export default function BillingPage() {
 
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionPending, setActionPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId || demoMode) {
@@ -67,37 +65,30 @@ export default function BillingPage() {
     }
   };
 
-  // Self-serve Stripe Checkout is intentionally not used -- upgrades go
-  // through manual contact/billing instead. The /api/checkout route stays
-  // in place but unused; this just stops routing users into it.
+  // There is no payment processor -- every plan change is a manual request
+  // sent to a real person by email, never an automated self-serve flow.
   const handleUpgrade = (tierId: "free" | "pro" | "enterprise") => {
-    if (tierId === "free") {
-      handleManageBilling();
+    if (demoMode) {
+      toast.error("Billing requires a real account (demo mode has no billing backend).");
       return;
     }
     const tierName = SUBSCRIPTION_TIERS.find((t) => t.id === tierId)?.name || tierId;
-    window.location.href = contactMailto(tierName);
+    const action = tierId === "free" ? "downgrade to" : "upgrade to";
+    window.location.href = contactMailto(
+      `MultiLLM ${tierName} plan`,
+      `Hi, I'd like to ${action} the ${tierName} plan.${userId ? `\n\nAccount: ${userId}` : ""}`
+    );
   };
 
-  const handleManageBilling = async () => {
-    if (!userId) return;
+  const handleRequestCancellation = () => {
     if (demoMode) {
-      toast.error("Billing requires a real account (demo mode has no payment backend).");
+      toast.error("Billing requires a real account (demo mode has no billing backend).");
       return;
     }
-    setActionPending("portal");
-    try {
-      const res = await fetch("/api/billing-portal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing portal");
-      window.location.href = data.url;
-    } catch (err: any) {
-      toast.error(err.message || "Could not open billing portal");
-      setActionPending(null);
-    }
+    window.location.href = contactMailto(
+      "MultiLLM subscription cancellation",
+      `Hi, I'd like to cancel my subscription.${userId ? `\n\nAccount: ${userId}` : ""}`
+    );
   };
 
   const currentPlan = subscription?.plan || user?.profile?.plan || "free";
@@ -160,12 +151,11 @@ export default function BillingPage() {
 
                     {currentPlan !== "free" && !demoMode && (
                       <button
-                        onClick={handleManageBilling}
-                        disabled={actionPending === "portal"}
-                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={handleRequestCancellation}
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        {actionPending === "portal" ? "Opening..." : "Manage Billing / Cancel"}
+                        Request Cancellation
                       </button>
                     )}
                   </div>
@@ -266,8 +256,7 @@ export default function BillingPage() {
                       ) : (
                         <button
                           onClick={() => handleUpgrade(tier.id)}
-                          disabled={actionPending === tier.id}
-                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
+                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold transition-colors"
                         >
                           {tier.price === 0 ? "Downgrade" : "Contact Sales"}
                         </button>
@@ -280,21 +269,30 @@ export default function BillingPage() {
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                 <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-purple-600" />
-                  Invoices & Payment Methods
+                  Invoices & Payment
                 </h2>
                 <p className="text-slate-600 mb-4">
-                  Invoices, payment methods, and past charges are managed securely through Stripe.
+                  Billing is handled directly, not through automated card payments. Invoices and payment
+                  arrangements are sent by email when you upgrade, and any question about an existing invoice goes
+                  straight to a real person.
                 </p>
                 {currentPlan !== "free" && !demoMode ? (
                   <button
-                    onClick={handleManageBilling}
+                    onClick={() =>
+                      (window.location.href = contactMailto(
+                        "MultiLLM invoice question",
+                        `Hi, I have a question about an invoice or payment on my ${currentPlan} plan.${
+                          userId ? `\n\nAccount: ${userId}` : ""
+                        }`
+                      ))
+                    }
                     className="py-3 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center gap-2"
                   >
                     <CreditCard className="w-4 h-4" />
-                    Open Billing Portal
+                    Ask About an Invoice
                   </button>
                 ) : (
-                  <p className="text-sm text-slate-500">Upgrade to a paid plan to view invoices.</p>
+                  <p className="text-sm text-slate-500">Upgrade to a paid plan to receive invoices.</p>
                 )}
               </div>
             </motion.div>

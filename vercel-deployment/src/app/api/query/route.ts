@@ -133,6 +133,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // profiles.is_active and .plan_expires_at exist in the schema (and are
+  // already enforced for platform API keys via getPlatformApiKeyByHash's own
+  // is_active filter) but were never actually checked on this, the session
+  // path -- a deactivated or expired account could still query normally.
+  // This is what makes revoking a demo/trial account (see scripts/
+  // demo-account.mjs) actually take effect rather than being cosmetic.
+  if (profile && profile.is_active === false) {
+    return NextResponse.json({ error: "This account has been deactivated." }, { status: 403 });
+  }
+  if (profile?.plan_expires_at && new Date(profile.plan_expires_at) < new Date()) {
+    return NextResponse.json(
+      { error: "Your plan has expired. Contact us to renew." },
+      { status: 402 }
+    );
+  }
+
   if (profile && profile.credits <= 0) {
     return NextResponse.json(
       { error: "Out of credits. Upgrade your plan to continue." },

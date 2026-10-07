@@ -11,7 +11,7 @@ comment is intentionally not rendered on the live page. -->
 
 ## 2. What we collect
 
-- **Account data**: name, email, company/agency name, billing details -- collected directly from you at signup and via Stripe.
+- **Account data**: name, email, company/agency name, billing details -- collected directly from you at signup and in billing correspondence. There is no automated payment processor; billing is handled directly with our team.
 - **API keys and configuration**: keys you provide for third-party AI providers, stored encrypted.
 - **Prompt and output content**: the text you submit for processing and the responses returned, handled per Section 3 below.
 - **Usage and telemetry**: latency, token counts, quality/confidence scores, and error rates, associated with your account and client-project labels, used for billing, analytics, and the reports we generate for you.
@@ -24,7 +24,7 @@ comment is intentionally not rendered on the live page. -->
 
 ## 4. Who we share data with (sub-processors)
 
-We share prompt content with the third-party AI providers necessary to answer your query. The current list is maintained in the DPA & Sub-processors document, and includes model providers (currently OpenAI and/or OpenRouter, Google Gemini, Mistral, and Groq -- only those with an active API key configured actually receive traffic) and infrastructure providers (Vercel for hosting, Supabase for database/auth, Stripe for payment processing). We do not sell your data.
+We share prompt content with the third-party AI providers necessary to answer your query. The current list is maintained in the DPA & Sub-processors document, and includes model providers (currently OpenAI and/or OpenRouter, Google Gemini, Mistral, and Groq -- only those with an active API key configured actually receive traffic) and infrastructure providers (Vercel for hosting, Supabase for database/auth). We do not sell your data.
 
 ## 5. International transfers
 

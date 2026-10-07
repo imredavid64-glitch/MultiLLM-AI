@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Zap, BarChart2, Key, Brain, Shield, Clock } from "lucide-react";
+import { Zap, BarChart2, Key, Briefcase, Shield, Clock } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -17,7 +17,7 @@ const SUBSCRIPTION_TIERS = [
 const quickActions = [
   { label: "New Ensemble Query", href: "/", icon: Zap, color: "bg-purple-600 hover:bg-purple-700" },
   { label: "Generate API Key", href: "/dashboard/api-keys", icon: Key, color: "bg-blue-600 hover:bg-blue-700" },
-  { label: "Train Custom Model", href: "/dashboard/training", icon: Brain, color: "bg-emerald-600 hover:bg-emerald-700" },
+  { label: "Client Projects", href: "/dashboard/projects", icon: Briefcase, color: "bg-emerald-600 hover:bg-emerald-700" },
   { label: "View Analytics", href: "/dashboard/analytics", icon: BarChart2, color: "bg-orange-600 hover:bg-orange-700" },
 ];
 
