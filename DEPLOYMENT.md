@@ -217,6 +217,7 @@ this is a recommendation, not a migration.
 | `GEMINI_API_KEY` | No | Google Gemini API key |
 | `MISTRAL_API_KEY` | No | Mistral API key |
 | `GROQ_API_KEY` | No | Groq API key |
+| `ANON_DAILY_QUERY_CAP` | No | Global daily cap across all anonymous (no-account) queries combined, on top of the 3/min per-IP limit (default: 200) |
 | `BOT_COUNT` | No | Parallel bots (default: 4) |
 | `PRIVACY_REDACTION` | No | Enable PII redaction (default: 1) |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Strongly recommended in production | Shared, cross-instance rate limiting; without these, limits are per-serverless-instance only and far weaker under horizontal scaling |

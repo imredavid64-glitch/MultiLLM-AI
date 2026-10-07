@@ -140,6 +140,18 @@ describe("POST /api/query", () => {
     expect(res.headers.get("Retry-After")).toBe("42");
   });
 
+  it("suggests signing up when the anonymous global daily cap is hit", async () => {
+    mocks.checkRateLimit.mockResolvedValue({ allowed: false, retryAfterSeconds: 3600, reason: "anon_daily_cap" });
+    vi.stubGlobal("fetch", vi.fn());
+
+    const res = await POST(postRequest({ prompt: "hello" }));
+    const json = await res.json();
+
+    expect(res.status).toBe(429);
+    expect(json.code).toBe("anon_daily_cap");
+    expect(json.error).toMatch(/sign up/i);
+  });
+
   it("returns a real answer and decrements credits on a successful ensemble response", async () => {
     vi.stubGlobal(
       "fetch",

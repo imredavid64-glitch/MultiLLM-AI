@@ -127,8 +127,12 @@ export async function POST(req: NextRequest) {
   const identityKey = apiKeyAuth ? `key:${apiKeyAuth.keyId}` : userId ? `user:${userId}` : undefined;
   const rateLimit = await checkRateLimit({ ip: getClientIp(req), identityKey, tier });
   if (!rateLimit.allowed) {
+    const message =
+      rateLimit.reason === "anon_daily_cap"
+        ? "MultiLLM's free anonymous demo has hit its query limit for today. Sign up for a free account to keep going."
+        : "Rate limit exceeded. Please slow down.";
     return NextResponse.json(
-      { error: "Rate limit exceeded. Please slow down." },
+      { error: message, code: rateLimit.reason },
       { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
     );
   }
