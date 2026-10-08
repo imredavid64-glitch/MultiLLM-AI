@@ -1,5 +1,16 @@
 -- Supabase Schema for MultiLLM
 -- Run this in Supabase SQL Editor
+--
+-- Safe to run top-to-bottom against a brand-new, empty Supabase project
+-- (e.g. for a staging environment -- see docs/STAGING.md) AND safe to
+-- re-run against an already-provisioned one: every CREATE TABLE/INDEX uses
+-- IF NOT EXISTS, every CREATE FUNCTION uses OR REPLACE, every
+-- CREATE POLICY/TRIGGER is preceded by its own DROP ... IF EXISTS, and every
+-- backfill ALTER TABLE ... ADD COLUMN uses IF NOT EXISTS so it's a no-op on
+-- a fresh table that already has the column from its own CREATE TABLE above.
+-- Audited 2026-10-08 for ordering hazards (a table/column/function referenced
+-- before it's defined) -- none found; every forward reference resolves to
+-- something created earlier in this same file.
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

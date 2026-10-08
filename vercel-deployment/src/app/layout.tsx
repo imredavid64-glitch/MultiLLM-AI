@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { Toaster } from "react-hot-toast";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import StagingBanner from "@/components/layout/staging-banner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -42,6 +43,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <ReactQueryProvider>
+            <StagingBanner />
             <Header />
             <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
               {children}
