@@ -125,6 +125,16 @@ async function create(opts) {
     console.error("Profile created, but failed to create the platform API key:", keyErr.message);
   }
 
+  // One sample client project so the account isn't a blank slate on first
+  // login -- demonstrates the multi-tenant project-tagging feature instead
+  // of making a brand-new demo user discover it from zero.
+  const { error: projectErr } = await supabase
+    .from("client_projects")
+    .insert({ user_id: userId, name: "Sample Client Project" });
+  if (projectErr) {
+    console.error("Profile created, but failed to create the sample client project:", projectErr.message);
+  }
+
   console.log(`
 Demo account created for ${email}
 

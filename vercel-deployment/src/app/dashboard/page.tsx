@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Zap, BarChart2, Key, Briefcase, Shield, Clock } from "lucide-react";
+import { Zap, BarChart2, Key, Briefcase, Shield, Clock, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import DashboardHeader from "@/components/layout/dashboard-header";
 import { TIERS as SUBSCRIPTION_TIERS, formatPrice } from "@/lib/pricing";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const quickActions = [
   { label: "New Ensemble Query", href: "/", icon: Zap, color: "bg-purple-600 hover:bg-purple-700" },
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const userId = user?.id || "";
   const [totals, setTotals] = useState<Totals>({ totalQueries: 0, avgAccuracy: 0, totalCarbonSaved: 0, avgLatencyMs: 0 });
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -37,9 +39,13 @@ export default function DashboardPage() {
         if (json.totals) setTotals(json.totals);
       } catch {
         // leave defaults
+      } finally {
+        setLoaded(true);
       }
     })();
   }, [userId]);
+
+  const isNewUser = loaded && totals.totalQueries === 0;
 
   const stats = [
     { label: "Queries This Month", value: totals.totalQueries.toLocaleString(), icon: Zap, color: "text-purple-600", bg: "bg-purple-100" },
@@ -88,25 +94,37 @@ export default function DashboardPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mb-8"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
-                  className="bg-white rounded-xl shadow-sm p-6 border border-slate-100"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`${stat.bg} p-3 rounded-xl`}>
-                      <stat.icon className={`w-6 h-6 ${stat.color}`} />
+            {isNewUser ? (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+                <EmptyState
+                  icon={Sparkles}
+                  title="No queries yet"
+                  description="Ask your first question and MultiLLM will run it across every connected model, score the candidates, and show you the best answer."
+                  actionHref="/#try-it"
+                  actionLabel="Ask your first question"
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {stats.map((stat, index) => (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+                    className="bg-white rounded-xl shadow-sm p-6 border border-slate-100"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`${stat.bg} p-3 rounded-xl`}>
+                        <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
-                  <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
-                </motion.div>
-              ))}
-            </div>
+                    <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </motion.section>
 
           {/* Quick Actions */}

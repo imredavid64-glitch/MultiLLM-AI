@@ -110,6 +110,7 @@ export default function AnalyticsPage() {
             </div>
             {projects.length > 0 && (
               <select
+                data-testid="analytics-project-select"
                 value={selectedProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
                 className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium"
