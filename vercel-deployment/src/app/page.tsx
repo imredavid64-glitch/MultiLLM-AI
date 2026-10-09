@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain, CheckCircle2, Sparkles } from "lucide-react";
+import { Zap, Shield, Cpu, Globe, ArrowRight, BarChart2, Layers, Target, Brain, CheckCircle2, Sparkles, Lock } from "lucide-react";
 import { toast } from "react-hot-toast";
 import type { SustainabilityMetrics } from "@/types/multi-llm";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { consumeEnsembleStream } from "@/lib/consumeSseStream";
+import { estimateQueryCost, formatCostEstimate } from "@/lib/costEstimator";
+import { parseAvailableProviderFamilies } from "@/lib/promptRouting";
+import type { ProviderFamily } from "@/lib/providerPricing";
 
 const quickPrompts = [
   "Explain quantum computing in simple terms",
@@ -14,8 +18,20 @@ const quickPrompts = [
   "How can I reduce my carbon footprint?",
 ];
 
+// Feature 2: human-readable labels for the pipeline stages streamed back
+// before synthesis tokens start arriving -- the parallel bot/scoring phases
+// aren't themselves token-streamed, so this is what fills that wait.
+const STAGE_LABELS: Record<string, string> = {
+  querying_models: "Querying models...",
+  scoring_candidates: "Scoring candidates...",
+  synthesizing: "Synthesizing...",
+  deep_review: "Cross-checking confidence...",
+};
+
+const LOCAL_ONLY_STORAGE_KEY = "multillm_local_only_mode";
+
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<
     | null
@@ -31,11 +47,44 @@ export default function HomePage() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [deepReview, setDeepReview] = useState(false);
+  // Feature 2 (streaming synthesis): status text for the parallel-bot/scoring
+  // stages (which aren't themselves streamed -- there's nothing to show
+  // token-by-token until synthesis starts) plus the synthesis answer's text
+  // as it arrives, so the user isn't staring at a blank screen the whole
+  // pipeline.
+  const [streamStage, setStreamStage] = useState<string | null>(null);
+  const [streamingAnswer, setStreamingAnswer] = useState("");
+  // Feature 4 (local-only mode): forces the whole pipeline onto the local
+  // TinyGPT models, zero remote calls. Initialized from the user's saved
+  // preference (or localStorage for an anonymous visitor) below.
+  const [localOnly, setLocalOnly] = useState(false);
+  // Feature 3 (cost estimator): which provider families are actually
+  // available to this caller, fetched once so the estimate can narrow to
+  // real options instead of assuming every provider is configured.
+  const [availableProviders, setAvailableProviders] = useState<ProviderFamily[] | null>(null);
 
   const plan = user?.profile?.plan || "free";
   const deepReviewAvailable = plan === "pro" || plan === "enterprise";
 
   const queryClient = useQueryClient();
+
+  const costEstimate = useMemo(
+    () => estimateQueryCost(query, availableProviders, localOnly),
+    [query, availableProviders, localOnly]
+  );
+  const costLabel = formatCostEstimate(costEstimate);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/query");
+        const json = await res.json();
+        setAvailableProviders(parseAvailableProviderFamilies(json.models || []));
+      } catch {
+        setAvailableProviders(null);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!user?.id) {
@@ -53,11 +102,41 @@ export default function HomePage() {
     })();
   }, [user?.id]);
 
+  // Feature 4: local-only mode is a per-user preference -- persisted on the
+  // profile row for a logged-in user (works in both demo and real Supabase
+  // mode, since useAuth().updateProfile already handles both), or
+  // localStorage for an anonymous visitor who has no profile row at all.
+  useEffect(() => {
+    if (user) {
+      setLocalOnly(Boolean(user.profile?.local_only_mode));
+      return;
+    }
+    if (typeof window !== "undefined") {
+      setLocalOnly(window.localStorage.getItem(LOCAL_ONLY_STORAGE_KEY) === "1");
+    }
+  }, [user]);
+
+  const handleLocalOnlyToggle = async (checked: boolean) => {
+    setLocalOnly(checked);
+    if (user) {
+      try {
+        await updateProfile({ local_only_mode: checked });
+      } catch {
+        toast.error("Couldn't save local-only mode preference");
+      }
+    } else if (typeof window !== "undefined") {
+      window.localStorage.setItem(LOCAL_ONLY_STORAGE_KEY, checked ? "1" : "0");
+    }
+  };
+
   const runQuery = async (text: string) => {
     if (!text.trim()) return;
     setQuery(text);
     setIsLoading(true);
-    const toastId = toast.loading("Querying ensemble of LLMs...");
+    setResult(null);
+    setStreamingAnswer("");
+    setStreamStage("querying_models");
+    const toastId = toast.loading(STAGE_LABELS.querying_models);
 
     try {
       const res = await fetch("/api/query", {
@@ -67,24 +146,49 @@ export default function HomePage() {
           prompt: text,
           project_id: selectedProjectId || undefined,
           deep_review: deepReviewAvailable && deepReview,
+          local_only: localOnly,
+          stream: true,
         }),
       });
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error || `Ensemble query failed (${res.status})`);
       }
-      const answer = await res.json();
-      
+
+      const finalPayload = await consumeEnsembleStream(res.body, {
+        onStage: (stage) => {
+          setStreamStage(stage);
+          toast.loading(STAGE_LABELS[stage] || "Running ensemble...", { id: toastId });
+        },
+        onToken: (chunk) => setStreamingAnswer((prev) => prev + chunk),
+        onRedacted: (text) => setStreamingAnswer(text),
+      });
+      if (!finalPayload) {
+        throw new Error("Ensemble stream ended without a result");
+      }
+
       toast.success("Ensemble complete!", { id: toastId });
-      setResult(answer);
-      
+      setResult({
+        answer: finalPayload.answer,
+        metrics: {
+          accuracy: finalPayload.metrics?.top_score || 0,
+          latency_s: (finalPayload.metrics?.latency_ms || 0) / 1000,
+          carbon_saved_g: finalPayload.metrics?.carbon_saved_g || 0,
+          emissions_g: finalPayload.metrics?.emissions_g || 0,
+        },
+        deep_review_confidence: finalPayload.confidence_score,
+        refined_prompt: finalPayload.refined_prompt,
+        token_savings: finalPayload.token_savings,
+      });
+
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
-      
+
     } catch (error) {
       toast.error(`Query failed: ${(error as Error).message}`, { id: toastId });
       setResult(null);
     } finally {
       setIsLoading(false);
+      setStreamStage(null);
     }
   };
 
@@ -170,6 +274,32 @@ export default function HomePage() {
             </button>
           </form>
 
+          {/* Feature 3: pre-send cost estimate, updates live as the user types */}
+          {query.trim() && costLabel && (
+            <p className="mt-2 text-center text-xs text-slate-400">{costLabel}</p>
+          )}
+
+          {/* Feature 4: local-only mode -- available to anyone, not just
+              logged-in users (an anonymous visitor's choice is kept in
+              localStorage; see handleLocalOnlyToggle). */}
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={localOnly}
+                onChange={(e) => handleLocalOnlyToggle(e.target.checked)}
+                disabled={isLoading}
+              />
+              Local-only mode
+            </label>
+            {localOnly && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                <Lock className="w-3 h-3" />
+                Local mode: no data leaves this device
+              </span>
+            )}
+          </div>
+
           {projects.length > 0 && (
             <div className="mt-3 flex items-center justify-center gap-2">
               <label htmlFor="project-select" className="text-sm text-slate-500">
@@ -232,6 +362,35 @@ export default function HomePage() {
           </div>
         </motion.div>
       </section>
+
+      {/* Streaming progress (Feature 2) -- shown while a query is in flight,
+          replaced by the final Results Section below once "done" arrives. */}
+      <AnimatePresence>
+        {isLoading && !result && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-4xl mx-auto"
+          >
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-600" />
+                </span>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {streamStage ? STAGE_LABELS[streamStage] || "Running ensemble..." : "Running ensemble..."}
+                </h2>
+              </div>
+              {streamingAnswer && (
+                <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{streamingAnswer}</p>
+              )}
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
 
       {/* Results Section */}
       <AnimatePresence>
