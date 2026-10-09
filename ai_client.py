@@ -9,7 +9,7 @@ import re
 import threading
 import time
 import urllib.parse
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as _FutureTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -457,6 +457,67 @@ def parse_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, parsed))
 
 
+# Per-provider-call wall-clock budget (generate_candidate below) and a
+# smaller budget for the single blocking synthesis/deep-review call that
+# follows the fan-out. Sized so the worst case (every bot call times out in
+# parallel, then synthesis also times out) stays comfortably under the
+# query-ensemble Vercel function's 60s maxDuration (api/query-ensemble/main.py),
+# with headroom for routing/source-retrieval/refine-prompt overhead:
+# PROVIDER_TIMEOUT_SECONDS (bot fan-out, runs in parallel so this is the
+# whole fan-out's budget, not per-bot-summed) + JUDGE_TIMEOUT_SECONDS
+# (synthesis) [+ JUDGE_TIMEOUT_SECONDS again if deep_review is requested].
+PROVIDER_TIMEOUT_SECONDS = parse_int_env("PROVIDER_TIMEOUT_SECONDS", default=20, minimum=1, maximum=55)
+JUDGE_TIMEOUT_SECONDS = parse_int_env("JUDGE_TIMEOUT_SECONDS", default=15, minimum=1, maximum=55)
+
+# Provider name used for the free, always-available local fallback model --
+# matches LocalTransformerProvider.name in local_models.py. A query answered
+# using only this (no remote provider succeeded) is refused rather than
+# silently returned -- see the NoRemoteProviderAnsweredError check in
+# build_ensemble_answer/build_ensemble_answer_stream below -- UNLESS the
+# caller's provider stack only ever contained the local model to begin with
+# (Feature 4's local-only mode), which is intentional, not a failure.
+LOCAL_PROVIDER_NAME = "Local TinyGPT (from scratch)"
+
+
+class NoRemoteProviderAnsweredError(RuntimeError):
+    """Raised when at least one remote provider was available for this query
+    but none of them produced a usable answer -- every successful candidate
+    came from the local fallback model. Distinct from "every provider
+    failed" (RuntimeError above it) so callers (main.py) can return a more
+    specific, honest error instead of a tiny local model's answer standing
+    in for the real ensemble."""
+
+
+def _call_with_timeout(fn: Any, timeout_seconds: float, *args: Any, **kwargs: Any) -> Any:
+    """Runs fn(*args, **kwargs) with a hard wall-clock budget. Python can't
+    forcibly kill a running thread, so a call that exceeds the timeout keeps
+    running in the background -- this bounds how long THIS request waits on
+    it, not the underlying network call itself. Raises plain TimeoutError
+    (classify_failure below checks for exactly that) on expiry."""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(fn, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout_seconds)
+        except _FutureTimeoutError:
+            raise TimeoutError(f"timed out after {timeout_seconds}s") from None
+
+
+def classify_failure(exc: BaseException) -> str:
+    """Classifies a provider-call failure into one of "timeout",
+    "rate_limited", or "error" for safe, structured surfacing in the API
+    response (QueryResponse.provider_failures) -- never the raw exception
+    text, which can embed a truncated upstream HTTP error body (see
+    http_post_json) or other internal detail, and never a key (keys are
+    never part of these messages to begin with -- see RoundRobinKeys)."""
+    if isinstance(exc, TimeoutError):
+        return "timeout"
+    if isinstance(exc, RateLimitError):
+        return "rate_limited"
+    if "HTTP 429" in str(exc):
+        return "rate_limited"
+    return "error"
+
+
 def load_keys_from_env(
     multi_env: str,
     single_env: str,
@@ -653,6 +714,44 @@ class OpenAIProvider:
         logger.error("%s call failed after %d retries: %s", self.name, MAX_RETRIES, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
+    def chat_stream(
+        self,
+        messages: Sequence[Dict[str, str]],
+        temperature: float,
+        gen_p: "GenerationConfig | None" = None,
+    ):
+        """Yields text chunks as they arrive. No retry-on-chunk here (unlike
+        chat()) -- a stream that fails mid-flight can't be silently retried
+        without either duplicating already-emitted text or discarding it;
+        callers decide what to do with a partial result. Raises before
+        yielding anything if the very first request fails, so a caller that
+        hasn't emitted output yet can still fall back to chat()."""
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": list(messages),
+            "temperature": temperature,
+            "stream": True,
+        }
+        if gen_p is None:
+            gen_p = GenerationConfig(temperature=temperature)
+        if gen_p.max_tokens is not None:
+            kwargs["max_tokens"] = gen_p.max_tokens
+        if gen_p.top_p is not None:
+            kwargs["top_p"] = gen_p.top_p
+        if gen_p.repetition_penalty is not None:
+            kwargs["frequency_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
+            kwargs["presence_penalty"] = 0.0
+
+        key = self._keys.next()
+        client = self._clients[key]
+        stream = client.chat.completions.create(**kwargs)
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = getattr(chunk.choices[0].delta, "content", None)
+            if delta:
+                yield delta
+
 
 class GeminiProvider:
     def __init__(self, api_keys: Sequence[Any], model: str) -> None:
@@ -803,6 +902,58 @@ class MistralProvider:
         logger.error("%s call failed after retries: %s", self.name, last_error)
         raise RuntimeError(f"{self.name} call failed after retries: {last_error}")
 
+    def chat_stream(
+        self,
+        messages: Sequence[Dict[str, str]],
+        temperature: float,
+        gen_p: "GenerationConfig | None" = None,
+    ):
+        """Yields text chunks via Mistral's SSE streaming endpoint. Same
+        no-mid-stream-retry trade-off as OpenAIProvider.chat_stream."""
+        if httpx is None:
+            raise RuntimeError("httpx is required for Mistral calls. Install with: pip install -U httpx")
+        if gen_p is None:
+            gen_p = GenerationConfig(temperature=temperature)
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": list(messages),
+            "temperature": temperature,
+            "stream": True,
+        }
+        if gen_p.top_p is not None:
+            payload["top_p"] = gen_p.top_p
+        if gen_p.max_tokens is not None:
+            payload["max_tokens"] = gen_p.max_tokens
+        if gen_p.repetition_penalty is not None:
+            payload["presence_penalty"] = _translate_rep_penalty(gen_p.repetition_penalty)
+            payload["frequency_penalty"] = 0.0
+
+        key = self._keys.next()
+        with httpx.Client(timeout=60.0) as client:
+            with client.stream(
+                "POST",
+                "https://api.mistral.ai/v1/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[len("data:") :].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        chunk = json.loads(data)
+                    except ValueError:
+                        continue
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = (choices[0].get("delta") or {}).get("content")
+                    if delta:
+                        yield delta
+
 
 def _tiered_keys(
     user_keys: "List[str] | None", platform_keys: "List[str] | None"
@@ -820,7 +971,10 @@ def _tiered_keys(
     return platform_keys or []
 
 
-def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> List[ChatProvider]:
+def build_provider_stack(
+    user_keys: "Dict[str, List[str]] | None" = None,
+    local_only: bool = False,
+) -> List[ChatProvider]:
     """Build the provider stack, preferring a caller's own keys per-provider.
 
     `user_keys` (e.g. {"openai": [...], "gemini": [...], "openrouter": [...]})
@@ -837,17 +991,33 @@ def build_provider_stack(user_keys: "Dict[str, List[str]] | None" = None) -> Lis
     mid-request, the platform's key picks up the rest of that request and
     every subsequent one, rather than failing that provider for the user
     until they notice and fix their key.
+
+    `local_only=True` (Feature 4) skips every remote provider entirely and
+    returns only the local TinyGPT provider -- the single place this
+    guarantee is enforced, so every caller (the FastAPI route, the CLI) gets
+    it for free rather than each having to remember to filter remote
+    providers out itself. Raises if no local model is trained/available,
+    since silently falling back to remote providers would defeat the whole
+    point of the mode.
     """
     user_keys = user_keys or {}
     providers: List[ChatProvider] = []
+    local_provider: "ChatProvider | None" = None
 
     try:
         from local_models import LocalTransformerProvider
 
-        if LocalTransformerProvider().size():
-            providers.append(LocalTransformerProvider())
+        candidate = LocalTransformerProvider()
+        if candidate.size():
+            local_provider = candidate
+            providers.append(candidate)
     except Exception as exc:
         logger.debug("Local model provider unavailable: %s", exc)
+
+    if local_only:
+        if local_provider is None:
+            raise RuntimeError("Local-only mode requested, but no local model is available. Run: python -m train.train")
+        return [local_provider]
 
     user_openai_keys = user_keys.get("openai") or user_keys.get("openrouter")
     platform_openai_keys = load_keys_from_env(
@@ -1178,6 +1348,7 @@ def generate_candidate(
     bot_instruction: str,
     privacy_redaction: bool,
     gen_p: "GenerationConfig" = GenerationConfig(),
+    timeout_seconds: float = PROVIDER_TIMEOUT_SECONDS,
 ) -> str:
     safe_user_input = redact_sensitive(user_input) if privacy_redaction else user_input
     recent_history = list(history[-MAX_HISTORY_MESSAGES:])
@@ -1209,7 +1380,9 @@ def generate_candidate(
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(recent_history)
     messages.append({"role": "user", "content": task_prompt})
-    return provider.chat(messages=messages, temperature=gen_p.temperature, gen_p=gen_p)
+    return _call_with_timeout(
+        provider.chat, timeout_seconds, messages=messages, temperature=gen_p.temperature, gen_p=gen_p
+    )
 
 
 def maybe_refine_prompt(user_input: str) -> str:
@@ -1267,7 +1440,9 @@ def run_deep_review(
     ]
 
     try:
-        reply = reviewer.chat(
+        reply = _call_with_timeout(
+            reviewer.chat,
+            JUDGE_TIMEOUT_SECONDS,
             messages=messages,
             temperature=0.0,
             gen_p=GenerationConfig(temperature=0.0, max_tokens=10),
@@ -1286,32 +1461,31 @@ def run_deep_review(
     )
 
 
-def build_ensemble_answer(
+def _generate_candidates(
     providers: Sequence[ChatProvider],
     history: Sequence[Dict[str, str]],
     user_input: str,
+    source_context: str,
     sources: Sequence[SourceChunk],
-    bot_count: int,
+    bot_configs: Sequence[Tuple[str, str]],
     privacy_redaction: bool,
-    gen_p: "GenerationConfig" = GenerationConfig(),
-    deep_review: bool = False,
-) -> Tuple[str, List[Candidate], Dict[str, float], "float | None"]:
-    from token_optimizer import optimize_context
+    gen_p: "GenerationConfig",
+    timeout_seconds: float = PROVIDER_TIMEOUT_SECONDS,
+) -> Tuple[List[Candidate], List[Dict[str, str]]]:
+    """Fan out one call per (bot, provider) pair in parallel and score each
+    reply. Shared by build_ensemble_answer and build_ensemble_answer_stream
+    so the two code paths can't drift on how candidates are produced/scored.
 
-    # Trim once per query, reused by every parallel bot call below -- the
-    # real saving is this trimmed context times bot_count, not just once.
-    optimized = optimize_context(sources, history)
-    sources = optimized.sources
-    history = optimized.history
-    token_savings = optimized.savings.as_dict()
-
-    source_context = format_sources_for_prompt(sources)
-    bot_configs = select_bot_configs(bot_count)
-    if not providers:
-        raise RuntimeError("No providers configured. Set API keys before testing.")
-
+    Returns (candidates, provider_failures). `candidates` includes a failed
+    bot's entry too (text="(bot failed: <reason>)", total_score=0.0, same as
+    before this function classified failures) so existing callers that filter
+    on that marker keep working unchanged; `provider_failures` is the new,
+    structured, sanitized list (provider_name/bot_name/reason only -- never
+    the raw exception or a key) for surfacing to the API response.
+    """
     candidates: List[Candidate] = []
-    with ThreadPoolExecutor(max_workers=bot_count) as executor:
+    provider_failures: List[Dict[str, str]] = []
+    with ThreadPoolExecutor(max_workers=max(1, len(bot_configs))) as executor:
         future_map = {}
         for idx, (bot_name, instruction) in enumerate(bot_configs):
             provider_index = idx % len(providers)
@@ -1326,6 +1500,7 @@ def build_ensemble_answer(
                 instruction,
                 privacy_redaction,
                 gen_p,
+                timeout_seconds,
             )
             future_map[future] = (bot_name, provider_index)
 
@@ -1345,11 +1520,13 @@ def build_ensemble_answer(
                     pass
                 total = (0.50 * s_score) + (0.25 * b_score) + (0.25 * c_score)
             except Exception as exc:
-                text = f"(bot failed: {exc})"
+                reason = classify_failure(exc)
+                text = f"(bot failed: {reason})"
                 s_score = 0.0
                 b_score = 0.0
                 c_score = 0.0
                 total = 0.0
+                provider_failures.append({"provider_name": provider_name, "bot_name": bot_name, "reason": reason})
 
             candidates.append(
                 Candidate(
@@ -1363,16 +1540,114 @@ def build_ensemble_answer(
                     total_score=total,
                 )
             )
+    return candidates, provider_failures
+
+
+def _route_for_query(
+    providers: Sequence[ChatProvider],
+    user_input: str,
+    bot_count: int,
+) -> Any:
+    """Applies Feature 1 (per-query model routing): classify the prompt,
+    narrow providers/personas when confident, otherwise fall back to the
+    full ensemble. Logged to stdout (not persisted anywhere) so routing
+    behavior can be verified/tuned by watching server logs."""
+    from prompt_router import route_prompt
+
+    decision = route_prompt(user_input, providers, BOT_PERSONAS, bot_count)
+    if decision.routed:
+        logger.info(
+            "prompt routed: category=%s confidence=%.2f providers=%s personas=%s",
+            decision.category,
+            decision.confidence,
+            [getattr(p, "name", "?") for p in decision.providers],
+            [name for name, _ in decision.bot_configs],
+        )
+    else:
+        logger.info(
+            "prompt routing ambiguous/low-confidence (category=%s confidence=%.2f) -- using full ensemble",
+            decision.category,
+            decision.confidence,
+        )
+    return decision
+
+
+def build_ensemble_answer(
+    providers: Sequence[ChatProvider],
+    history: Sequence[Dict[str, str]],
+    user_input: str,
+    sources: Sequence[SourceChunk],
+    bot_count: int,
+    privacy_redaction: bool,
+    gen_p: "GenerationConfig" = GenerationConfig(),
+    deep_review: bool = False,
+    failures_out: "List[Dict[str, str]] | None" = None,
+    provider_timeout_seconds: "float | None" = None,
+) -> Tuple[str, List[Candidate], Dict[str, float], "float | None"]:
+    """`failures_out`, if given a list, gets each failed bot's
+    {provider_name, bot_name, reason} appended to it -- an additive,
+    optional out-param rather than widening this function's long-depended-on
+    4-tuple return (ai_client_app.py, ai_client_ui.py, ai_client_test_ui.py,
+    this module's own CLI, and tests/ all unpack that 4-tuple positionally).
+
+    `provider_timeout_seconds`, if given, overrides PROVIDER_TIMEOUT_SECONDS
+    for just this call (e.g. a fast, deterministic test of the timeout path
+    without waiting on the real default)."""
+    timeout_seconds = provider_timeout_seconds if provider_timeout_seconds is not None else PROVIDER_TIMEOUT_SECONDS
+    from token_optimizer import optimize_context
+
+    # Trim once per query, reused by every parallel bot call below -- the
+    # real saving is this trimmed context times bot_count, not just once.
+    optimized = optimize_context(sources, history)
+    sources = optimized.sources
+    history = optimized.history
+    token_savings = optimized.savings.as_dict()
+
+    source_context = format_sources_for_prompt(sources)
+    if not providers:
+        raise RuntimeError("No providers configured. Set API keys before testing.")
+
+    routing = _route_for_query(providers, user_input, bot_count)
+    routed_providers = routing.providers
+    bot_configs = routing.bot_configs
+
+    candidates, provider_failures = _generate_candidates(
+        routed_providers,
+        history,
+        user_input,
+        source_context,
+        sources,
+        bot_configs,
+        privacy_redaction,
+        gen_p,
+        timeout_seconds,
+    )
+    if failures_out is not None:
+        failures_out.extend(provider_failures)
 
     successful = [item for item in candidates if not item.text.startswith("(bot failed:")]
     successful.sort(key=lambda item: item.total_score, reverse=True)
     if not successful:
         raise RuntimeError("All provider calls failed. Check API keys, models, and network access.")
 
+    # A query answered using only the free local fallback model, when a real
+    # remote provider was in play for this query but every one of them
+    # failed, isn't the ensemble answer a caller is expecting -- refuse it
+    # instead of quietly handing back the tiny local model's guess. Doesn't
+    # fire for an intentionally local-only provider stack (Feature 4), since
+    # then there was never a remote provider in routed_providers to begin with.
+    remote_available = any(p.name != LOCAL_PROVIDER_NAME for p in routed_providers)
+    remote_successes = [c for c in successful if c.provider_name != LOCAL_PROVIDER_NAME]
+    if remote_available and not remote_successes:
+        raise NoRemoteProviderAnsweredError(
+            "No remote provider answered this query -- refusing to return an answer built only from the local "
+            "fallback model."
+        )
+
     top_candidates = successful[:3]
-    synthesis_provider = providers[top_candidates[0].provider_index]
+    synthesis_provider = routed_providers[top_candidates[0].provider_index]
     for candidate in top_candidates:
-        provider = providers[candidate.provider_index]
+        provider = routed_providers[candidate.provider_index]
         if provider.name != "Local TinyGPT (from scratch)":
             synthesis_provider = provider
             break
@@ -1400,7 +1675,13 @@ def build_ensemble_answer(
 
     try:
         synthesis_gen = GenerationConfig(temperature=0.1, max_tokens=gen_p.max_tokens)
-        final_answer = synthesis_provider.chat(messages=synthesis_messages, temperature=0.1, gen_p=synthesis_gen)
+        final_answer = _call_with_timeout(
+            synthesis_provider.chat,
+            JUDGE_TIMEOUT_SECONDS,
+            messages=synthesis_messages,
+            temperature=0.1,
+            gen_p=synthesis_gen,
+        )
     except Exception:
         final_answer = successful[0].text
 
@@ -1420,6 +1701,172 @@ def build_ensemble_answer(
         )
 
     return final_answer, successful, token_savings, confidence_score
+
+
+def build_ensemble_answer_stream(
+    providers: Sequence[ChatProvider],
+    history: Sequence[Dict[str, str]],
+    user_input: str,
+    sources: Sequence[SourceChunk],
+    bot_count: int,
+    privacy_redaction: bool,
+    gen_p: "GenerationConfig" = GenerationConfig(),
+    deep_review: bool = False,
+):
+    """Generator twin of build_ensemble_answer (Feature 2: streaming
+    synthesis). Candidate generation/scoring is identical (delegates to the
+    same _generate_candidates helper, so the two paths can't silently
+    diverge); only the final synthesis call is streamed, token by token, as
+    it's the one the user is actually waiting on once bots have already run.
+
+    Yields dicts, in order:
+      {"event": "status", "stage": "querying_models" | "scoring_candidates" | "synthesizing" | "deep_review"}
+      {"event": "token", "text": "..."}            (repeated, as text streams in)
+      {"event": "done", "answer": ..., "candidates": [...], "token_savings": {...},
+       "confidence_score": float | None, "routing": {...}}
+
+    Falls back to a single "token" event carrying the whole answer when the
+    chosen synthesis provider has no chat_stream (see ChatProvider's
+    duck-typed `chat_stream`) -- the final "done" event is identical either
+    way, so a caller that only cares about the final answer doesn't need to
+    special-case either path.
+    """
+    from token_optimizer import optimize_context
+
+    yield {"event": "status", "stage": "querying_models"}
+
+    optimized = optimize_context(sources, history)
+    sources = optimized.sources
+    history = optimized.history
+    token_savings = optimized.savings.as_dict()
+
+    source_context = format_sources_for_prompt(sources)
+    if not providers:
+        raise RuntimeError("No providers configured. Set API keys before testing.")
+
+    routing = _route_for_query(providers, user_input, bot_count)
+    routed_providers = routing.providers
+    bot_configs = routing.bot_configs
+
+    candidates, provider_failures = _generate_candidates(
+        routed_providers, history, user_input, source_context, sources, bot_configs, privacy_redaction, gen_p
+    )
+
+    yield {"event": "status", "stage": "scoring_candidates"}
+
+    successful = [item for item in candidates if not item.text.startswith("(bot failed:")]
+    successful.sort(key=lambda item: item.total_score, reverse=True)
+    if not successful:
+        raise RuntimeError("All provider calls failed. Check API keys, models, and network access.")
+
+    remote_available = any(p.name != LOCAL_PROVIDER_NAME for p in routed_providers)
+    remote_successes = [c for c in successful if c.provider_name != LOCAL_PROVIDER_NAME]
+    if remote_available and not remote_successes:
+        raise NoRemoteProviderAnsweredError(
+            "No remote provider answered this query -- refusing to return an answer built only from the local "
+            "fallback model."
+        )
+
+    top_candidates = successful[:3]
+    synthesis_provider = routed_providers[top_candidates[0].provider_index]
+    for candidate in top_candidates:
+        provider = routed_providers[candidate.provider_index]
+        if provider.name != "Local TinyGPT (from scratch)":
+            synthesis_provider = provider
+            break
+
+    synthesis_prompt = (
+        "You are the final judge. Merge the best parts of candidate answers into one superior response.\n"
+        "Rules:\n"
+        "- Keep only claims with source support or mark as uncertain.\n"
+        "- Preserve balanced framing to reduce bias.\n"
+        "- Keep citations like [S1] when factual claims are retained.\n"
+        "- If candidates conflict, explain the conflict briefly.\n\n"
+        f"User question:\n{redact_sensitive(user_input) if privacy_redaction else user_input}\n\n"
+        "Candidate answers:\n"
+    )
+    for idx, item in enumerate(top_candidates, start=1):
+        synthesis_prompt += (
+            f"Candidate {idx} ({item.bot_name}, provider={item.provider_name}, score={item.total_score:.2f}):\n"
+            f"{item.text}\n\n"
+        )
+
+    synthesis_messages = [
+        {"role": "system", "content": "Produce one final, practical, unbiased answer."},
+        {"role": "user", "content": synthesis_prompt},
+    ]
+    synthesis_gen = GenerationConfig(temperature=0.1, max_tokens=gen_p.max_tokens)
+
+    yield {"event": "status", "stage": "synthesizing"}
+
+    final_answer = ""
+    stream_fn = getattr(synthesis_provider, "chat_stream", None)
+    if stream_fn is not None:
+        try:
+            for chunk in stream_fn(messages=synthesis_messages, temperature=0.1, gen_p=synthesis_gen):
+                if not chunk:
+                    continue
+                final_answer += chunk
+                yield {"event": "token", "text": chunk}
+        except Exception as exc:
+            if final_answer:
+                # Partial text already reached the caller -- restarting via
+                # the blocking call below would duplicate it client-side, so
+                # the partial stream becomes the final answer instead of a
+                # clean retry. Logged loudly since this is a real quality
+                # degradation, not the ordinary "provider doesn't stream" case.
+                logger.warning(
+                    "%s streaming synthesis failed mid-stream, keeping partial answer: %s",
+                    synthesis_provider.name,
+                    exc,
+                )
+            else:
+                logger.warning(
+                    "%s streaming synthesis failed before any output, falling back to a blocking call: %s",
+                    synthesis_provider.name,
+                    exc,
+                )
+                stream_fn = None
+
+    if stream_fn is None and not final_answer:
+        try:
+            final_answer = _call_with_timeout(
+                synthesis_provider.chat,
+                JUDGE_TIMEOUT_SECONDS,
+                messages=synthesis_messages,
+                temperature=0.1,
+                gen_p=synthesis_gen,
+            )
+        except Exception:
+            final_answer = successful[0].text
+        yield {"event": "token", "text": final_answer}
+
+    if detect_sensitive_hits(final_answer):
+        final_answer = redact_sensitive(final_answer)
+        yield {"event": "redacted", "text": final_answer}
+
+    final_answer = final_answer.strip()
+
+    confidence_score: float | None = None
+    if deep_review:
+        yield {"event": "status", "stage": "deep_review"}
+        confidence_score = run_deep_review(
+            answer=final_answer,
+            sources=sources,
+            providers=providers,
+            exclude_provider=synthesis_provider,
+            privacy_redaction=privacy_redaction,
+        )
+
+    yield {
+        "event": "done",
+        "answer": final_answer,
+        "candidates": successful,
+        "token_savings": token_savings,
+        "confidence_score": confidence_score,
+        "routing": {"category": routing.category, "confidence": routing.confidence, "routed": routing.routed},
+        "provider_failures": provider_failures,
+    }
 
 
 def print_help() -> None:

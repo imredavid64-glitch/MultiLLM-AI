@@ -14,6 +14,7 @@ and a deployed function can't reach files above that.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -21,7 +22,7 @@ import uuid
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
@@ -29,12 +30,14 @@ from ai_client import (
     build_provider_stack,
     SourceIndex,
     build_ensemble_answer,
+    build_ensemble_answer_stream,
     maybe_refine_prompt,
     format_provider_status,
     SOURCES_DIR,
     MAX_PARALLEL_BOTS,
     parse_int_env,
     parse_bool_env,
+    NoRemoteProviderAnsweredError,
 )
 from token_optimizer import estimate_tokens
 
@@ -187,6 +190,8 @@ class QueryRequest(BaseModel):
     provider_keys: Optional[Dict[str, List[str]]] = None
     # Tier-gated on the Next.js side before this is ever set to true.
     deep_review: Optional[bool] = False
+    # Feature 4: force the local TinyGPT provider only, zero remote calls.
+    local_only: Optional[bool] = False
 
 
 class CandidateResponse(BaseModel):
@@ -210,23 +215,42 @@ class QueryResponse(BaseModel):
     token_savings: Optional[Dict[str, float]] = None
     request_id: Optional[str] = None
     confidence_score: Optional[float] = None
+    # Feature 1: which category/providers this prompt was routed to, surfaced
+    # so routing can be verified/tuned from the response, not just server logs.
+    routing: Optional[Dict[str, Any]] = None
+    # Which bots failed and why (timeout / error / rate_limited), sanitized --
+    # never a raw exception body or a key. Empty when every bot succeeded.
+    provider_failures: List[Dict[str, str]] = []
+
+
+def _resolve_request_providers(request: "QueryRequest"):
+    """Shared by both /api/query and /api/query/stream: resolve the actual
+    provider stack for this one request, honoring BYO keys and local-only
+    mode. Never built once at module scope -- it must never be shared across
+    requests/users. request.provider_keys itself is never logged (only which
+    providers ended up in use, by name)."""
+    request_providers = providers
+    if request.provider_keys:
+        request_providers = build_provider_stack(user_keys=request.provider_keys) or providers
+
+    if request.local_only:
+        request_providers = [p for p in request_providers if getattr(p, "name", "") == "Local TinyGPT (from scratch)"]
+        if not request_providers:
+            raise HTTPException(
+                status_code=503,
+                detail="Local-only mode requested, but no local model is available. Run `python -m train.train` first.",
+            )
+        return request_providers
+
+    if not request_providers:
+        raise HTTPException(status_code=503, detail="No providers configured. Set API keys.")
+    return request_providers
 
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_ensemble(request: QueryRequest, http_request: Request):
     request_id = getattr(http_request.state, "request_id", None) or str(uuid.uuid4())
-
-    # BYO keys: build a per-request stack that prefers the caller's own
-    # provider keys, falling back to the platform's for any provider they
-    # haven't connected. Never build this once at module scope -- it must
-    # never be shared across requests/users. request.provider_keys itself is
-    # never logged (only which providers ended up in use, by name).
-    request_providers = providers
-    if request.provider_keys:
-        request_providers = build_provider_stack(user_keys=request.provider_keys) or providers
-
-    if not request_providers:
-        raise HTTPException(status_code=503, detail="No providers configured. Set API keys.")
+    request_providers = _resolve_request_providers(request)
 
     bot_count = request.bot_count or BOT_COUNT
     bot_count = max(2, min(MAX_PARALLEL_BOTS, bot_count))
@@ -237,6 +261,7 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
         start = time.perf_counter()
         refined_prompt = maybe_refine_prompt(request.prompt)
         sources = source_index.retrieve(refined_prompt, top_k=request.top_k or 6)
+        provider_failures: List[Dict[str, str]] = []
         answer, candidates, token_savings, confidence_score = build_ensemble_answer(
             providers=request_providers,
             history=[],
@@ -245,6 +270,7 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
             bot_count=bot_count,
             privacy_redaction=privacy_redaction,
             deep_review=bool(request.deep_review),
+            failures_out=provider_failures,
         )
         latency_ms = (time.perf_counter() - start) * 1000
 
@@ -257,6 +283,15 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
         emissions_g = round(total_tokens / 1000 * CARBON_G_PER_1K_TOKENS, 4)
         carbon_saved_g = round(token_savings.get("tokens_saved", 0) / 1000 * CARBON_G_PER_1K_TOKENS, 4)
         providers_used = sorted({c.provider_name for c in candidates})
+
+        # Cheap, side-effect-free re-classification purely for display -- the
+        # actual routing decision (which already ran, and logged, inside
+        # build_ensemble_answer) isn't threaded back through its return value
+        # since that would change a signature other callers (ai_client_ui.py,
+        # ai_client_app.py, ai_client_test_ui.py, tests/) depend on.
+        from prompt_router import classify_prompt
+
+        classification = classify_prompt(refined_prompt)
 
         return QueryResponse(
             answer=answer,
@@ -290,10 +325,113 @@ async def query_ensemble(request: QueryRequest, http_request: Request):
             token_savings=token_savings,
             confidence_score=confidence_score,
             request_id=request_id,
+            routing={"category": classification.category, "confidence": classification.confidence},
+            provider_failures=provider_failures,
         )
+    except NoRemoteProviderAnsweredError as e:
+        logger.warning("request %s: %s", request_id, e)
+        raise HTTPException(status_code=503, detail=f"{e} (request_id={request_id})")
     except Exception as e:
         logger.error("request %s failed: %s", request_id, e)
         raise HTTPException(status_code=500, detail=f"{e} (request_id={request_id})")
+
+
+def _candidate_to_dict(c: Any) -> Dict[str, Any]:
+    return {
+        "bot_name": c.bot_name,
+        "provider_name": c.provider_name,
+        "source_score": c.source_score,
+        "bias_score": c.bias_score,
+        "clarity_score": c.clarity_score,
+        "total_score": c.total_score,
+        "text": c.text,
+    }
+
+
+@app.post("/api/query/stream")
+async def query_ensemble_stream(request: QueryRequest, http_request: Request):
+    """SSE variant of /api/query (Feature 2): streams the synthesis step's
+    tokens as they arrive instead of waiting for the full pipeline. Every
+    event is a `data: {...}\\n\\n` line; the final "done" event carries the
+    same shape /api/query returns in one shot (metrics, candidates, sources,
+    routing), so a caller that only wants the end state can ignore every
+    event until that one."""
+    request_id = getattr(http_request.state, "request_id", None) or str(uuid.uuid4())
+    request_providers = _resolve_request_providers(request)
+
+    bot_count = request.bot_count or BOT_COUNT
+    bot_count = max(2, min(MAX_PARALLEL_BOTS, bot_count))
+    privacy_redaction = request.privacy_redaction if request.privacy_redaction is not None else PRIVACY_REDACTION
+
+    async def event_source():
+        start = time.perf_counter()
+        try:
+            refined_prompt = maybe_refine_prompt(request.prompt)
+            sources = source_index.retrieve(refined_prompt, top_k=request.top_k or 6)
+
+            for event in build_ensemble_answer_stream(
+                providers=request_providers,
+                history=[],
+                user_input=refined_prompt,
+                sources=sources,
+                bot_count=bot_count,
+                privacy_redaction=privacy_redaction,
+                deep_review=bool(request.deep_review),
+            ):
+                if event["event"] != "done":
+                    yield f"data: {json.dumps(event)}\n\n"
+                    continue
+
+                latency_ms = (time.perf_counter() - start) * 1000
+                candidates = event["candidates"]
+                answer = event["answer"]
+                token_savings = event["token_savings"]
+                context_tokens = token_savings.get("tokens_after", 0) * bot_count
+                output_tokens = sum(estimate_tokens(c.text) for c in candidates) + estimate_tokens(answer)
+                total_tokens = context_tokens + output_tokens
+                emissions_g = round(total_tokens / 1000 * CARBON_G_PER_1K_TOKENS, 4)
+                carbon_saved_g = round(token_savings.get("tokens_saved", 0) / 1000 * CARBON_G_PER_1K_TOKENS, 4)
+                providers_used = sorted({c.provider_name for c in candidates})
+
+                payload = {
+                    "event": "done",
+                    "answer": answer,
+                    "candidates": [_candidate_to_dict(c) for c in candidates],
+                    "sources": [{"source_id": s.source_id, "path": str(s.path), "text": s.text[:200]} for s in sources],
+                    "metrics": {
+                        "source_support": (
+                            round(sum(c.source_score for c in candidates) / len(candidates), 3) if candidates else 0
+                        ),
+                        "bias": (
+                            round(sum(c.bias_score for c in candidates) / len(candidates), 3) if candidates else 0
+                        ),
+                        "clarity": (
+                            round(sum(c.clarity_score for c in candidates) / len(candidates), 3) if candidates else 0
+                        ),
+                        "top_score": round(candidates[0].total_score, 3) if candidates else 0,
+                        "latency_ms": round(latency_ms, 1),
+                        "carbon_saved_g": carbon_saved_g,
+                        "emissions_g": emissions_g,
+                    },
+                    "provider_status": format_provider_status(request_providers),
+                    "providers_used": providers_used,
+                    "refined_prompt": refined_prompt if refined_prompt != request.prompt else None,
+                    "token_savings": token_savings,
+                    "confidence_score": event.get("confidence_score"),
+                    "routing": event.get("routing"),
+                    "provider_failures": event.get("provider_failures", []),
+                    "request_id": request_id,
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+        except Exception as e:
+            logger.error("stream request %s failed: %s", request_id, e)
+            yield f"data: {json.dumps({'event': 'error', 'detail': str(e), 'request_id': request_id})}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"x-request-id": request_id, "Cache-Control": "no-cache, no-transform"},
+    )
 
 
 @app.get("/api/health")

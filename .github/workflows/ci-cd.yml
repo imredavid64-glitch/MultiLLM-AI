@@ -49,7 +49,7 @@ jobs:
       
       - name: Run Python type checking (mypy)
         run: |
-          mypy ai_client.py local_models.py train/ token_optimizer.py --ignore-missing-imports
+          mypy ai_client.py local_models.py train/ token_optimizer.py prompt_router.py --ignore-missing-imports
 
       - name: Run Python tests
         run: |
@@ -164,6 +164,7 @@ jobs:
           check_vendored ai_client.py vercel-deployment/api/query-ensemble/ai_client.py
           check_vendored local_models.py vercel-deployment/api/query-ensemble/local_models.py
           check_vendored token_optimizer.py vercel-deployment/api/query-ensemble/token_optimizer.py
+          check_vendored prompt_router.py vercel-deployment/api/query-ensemble/prompt_router.py
 
   # Training function tests: skipped. training-job is excluded from
   # deployment (vercel-deployment/training-job-disabled/, not under api/ --
