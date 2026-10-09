@@ -423,6 +423,14 @@ async def query_ensemble_stream(request: QueryRequest, http_request: Request):
                     "request_id": request_id,
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
+        except NoRemoteProviderAnsweredError as e:
+            # Mirror /api/query's own handling of this case (a clean, specific
+            # refusal) instead of falling into the generic except below --
+            # otherwise this one failure mode reads identically to any other
+            # internal error on the streaming path, even though the
+            # non-streaming endpoint treats it as its own distinct case.
+            logger.warning("stream request %s: %s", request_id, e)
+            yield f"data: {json.dumps({'event': 'error', 'code': 'no_remote_provider_answered', 'detail': str(e), 'request_id': request_id})}\n\n"
         except Exception as e:
             logger.error("stream request %s failed: %s", request_id, e)
             yield f"data: {json.dumps({'event': 'error', 'detail': str(e), 'request_id': request_id})}\n\n"
