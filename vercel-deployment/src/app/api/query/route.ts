@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/client";
 import { MultiLLM } from "@/lib/multi-llm";
-import { getProfile, consumeCredits, getApiKeys, getClientProject, incrementApiKeyUsage } from "@/lib/supabase/services";
+import {
+  getProfile,
+  consumeCredits,
+  getApiKeys,
+  getClientProject,
+  incrementApiKeyUsage,
+  getTodayProviderSpendUsd,
+  recordQueryError,
+} from "@/lib/supabase/services";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUserId } from "@/lib/supabase/serverAuth";
 import { checkRateLimit, getClientIp, type Tier } from "@/lib/rateLimiter";
 import { decryptApiKey } from "@/lib/encryption";
 import { isDemoMode } from "@/lib/demoMode";
+import { evaluateSpendCap, getDailySpendCapUsd } from "@/lib/spendCap";
+import { estimateQueryCostUsd } from "@/lib/providerCost";
+import { maybeSendLowCreditsEmail } from "@/lib/lifecycleEmails";
 
 /**
  * Loads the user's own BYO provider keys (if any), decrypted server-side
@@ -79,12 +90,47 @@ async function callPythonEnsemble(prompt: string, options: any = {}, requestId?:
   }
 }
 
+// Feature 2 (streaming synthesis): same request as callPythonEnsemble, but to
+// the SSE-emitting sibling route, with a longer timeout -- the user is
+// actively watching tokens arrive, so a slow-but-progressing stream
+// shouldn't be cut off at the same 55s budget used for a single blocking
+// call.
+async function streamPythonEnsemble(
+  prompt: string,
+  options: any = {},
+  requestId?: string
+): Promise<Response | null> {
+  try {
+    const response = await fetch(`${PYTHON_ENSEMBLE_URL}/api/query/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        "x-internal-secret": process.env.INTERNAL_API_SECRET || "",
+        ...(requestId ? { "x-request-id": requestId } : {}),
+      },
+      body: JSON.stringify({ prompt, ...options }),
+      signal: AbortSignal.timeout(90000),
+    });
+    if (!response.ok || !response.body) {
+      console.warn("Python ensemble stream returned", response.status);
+      return null;
+    }
+    return response;
+  } catch (error) {
+    console.warn("Python ensemble stream unavailable:", error);
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const requestId = req.headers.get("x-request-id") || crypto.randomUUID();
   let prompt = "";
   let options = {};
   let requestedProjectId = "";
   let requestedDeepReview = false;
+  let requestedStream = false;
+  let requestedLocalOnly = false;
 
   // Programmatic access via a generated API key takes precedence over the
   // dashboard's own logged-in session. Neither is ever taken from the
@@ -98,6 +144,8 @@ export async function POST(req: NextRequest) {
     prompt = typeof body?.prompt === "string" ? body.prompt : "";
     requestedProjectId = typeof body?.project_id === "string" ? body.project_id : "";
     requestedDeepReview = body?.deep_review === true;
+    requestedStream = body?.stream === true;
+    requestedLocalOnly = body?.local_only === true;
     options = {
       bot_count: body?.bot_count,
       top_k: body?.top_k,
@@ -134,6 +182,11 @@ export async function POST(req: NextRequest) {
   const demoMode = isDemoMode();
   const tier: Tier = (apiKeyAuth?.tier as Tier) || (profile?.plan as Tier) || (demoMode ? "pro" : "free");
   const deepReviewAllowed = requestedDeepReview && (demoMode || DEEP_REVIEW_PLANS.has(profile?.plan || "free"));
+  // Feature 4: local-only mode. A per-request flag takes precedence (lets an
+  // anonymous visitor, who has no profile row, still use it from
+  // localStorage), falling back to the logged-in user's saved preference so
+  // it stays on across sessions/devices without the client re-sending it.
+  const localOnly = requestedLocalOnly || profile?.local_only_mode === true;
   const identityKey = apiKeyAuth
     ? `key:${apiKeyAuth.keyId}`
     : userId
@@ -184,18 +237,66 @@ export async function POST(req: NextRequest) {
         { status: 402 }
       );
     }
+    // Fire-and-forget: a lifecycle email should never block or fail the
+    // query itself. No-ops unless this just dropped below 10% of the plan's
+    // allowance, and is deduped per credit period (see tryClaimLifecycleEmail).
+    maybeSendLowCreditsEmail(profile, consumption.remainingCredits).catch((err) =>
+      console.warn("Low-credits email failed:", err)
+    );
+  }
+
+  // Global daily spend cap: once today's estimated provider cost (across
+  // every account combined) reaches the cap, stop calling paid providers
+  // entirely rather than let individual accounts keep spending past it.
+  // Checked after credits (a capped-out request still cost the user a
+  // credit, same trade-off as the downstream-failure case above) but before
+  // any provider is actually called. Doesn't apply to local-only mode at
+  // all -- it makes zero paid-provider calls, so it can't contribute to (or
+  // be blocked by) a cap that exists purely to bound paid-provider spend.
+  const dailySpendCapUsd = getDailySpendCapUsd();
+  if (!localOnly && dailySpendCapUsd !== null) {
+    const todaySpendUsd = await getTodayProviderSpendUsd();
+    const spendCap = evaluateSpendCap(todaySpendUsd, dailySpendCapUsd);
+    if (spendCap.warn && !spendCap.blocked) {
+      console.warn(
+        `ALERT: daily provider spend at $${todaySpendUsd.toFixed(2)} of $${dailySpendCapUsd.toFixed(2)} cap (>=80%).`
+      );
+    }
+    if (spendCap.blocked) {
+      console.warn(
+        `Daily provider spend cap reached ($${todaySpendUsd.toFixed(2)} of $${dailySpendCapUsd.toFixed(2)}) -- refusing to call paid providers.`
+      );
+      return NextResponse.json(
+        {
+          error: "MultiLLM is temporarily limited due to high demand. Please try again later.",
+          code: "SPEND_CAP_REACHED",
+          request_id: requestId,
+        },
+        { status: 503, headers: { "Retry-After": "300", "x-request-id": requestId } }
+      );
+    }
   }
 
   // BYO provider keys: if the user has connected their own (encrypted at
   // rest, decrypted only here, server-side, for this one request), run
   // their query against those instead of the platform's keys, falling back
-  // to the platform's per-provider when they haven't connected one.
-  const userProviderKeys = userId ? await loadUserProviderKeys(userId) : null;
+  // to the platform's per-provider when they haven't connected one. Skipped
+  // entirely for local-only mode -- nothing would use them, so there's no
+  // reason to decrypt a user's keys on a request that won't call any
+  // remote provider.
+  const userProviderKeys = !localOnly && userId ? await loadUserProviderKeys(userId) : null;
   if (userProviderKeys) {
     options = { ...options, provider_keys: userProviderKeys };
   }
   if (deepReviewAllowed) {
     options = { ...options, deep_review: true };
+  }
+  if (localOnly) {
+    options = { ...options, local_only: true };
+  }
+
+  if (requestedStream) {
+    return handleStreamingQuery({ prompt, options, requestId, userId, projectId, apiKeyAuth });
   }
 
   // Policy: when the Python ensemble is unreachable, fail loudly (503) rather
@@ -206,6 +307,7 @@ export async function POST(req: NextRequest) {
   // fallback below, which doesn't fabricate a query result.
   const pythonResult = await callPythonEnsemble(prompt, options, requestId);
   if (!pythonResult) {
+    if (userId) recordQueryError(userId, "ensemble_unavailable").catch(() => {});
     return NextResponse.json(
       {
         error: "The ensemble backend is temporarily unavailable. Please try again shortly.",
@@ -231,6 +333,8 @@ export async function POST(req: NextRequest) {
   const deepReviewConfidence: number | null =
     typeof pythonResult.confidence_score === "number" ? pythonResult.confidence_score : null;
 
+  const estimatedCostUsd = estimateQueryCostUsd({ prompt, candidates, finalAnswer: answer });
+
   // Save query history if userId provided
   if (userId) {
     const supabase = createServerSupabaseClient();
@@ -247,6 +351,7 @@ export async function POST(req: NextRequest) {
       emissions: metrics.emissions_g,
       candidates,
       sources,
+      estimated_cost_usd: estimatedCostUsd,
     };
     await supabase.from("queries").insert(queryRecord as any);
   }
@@ -267,9 +372,132 @@ export async function POST(req: NextRequest) {
       request_id: requestId,
       project_id: projectId,
       deep_review_confidence: deepReviewConfidence,
+      // Feature 1: which category/providers this prompt was routed to --
+      // same info already logged server-side (ai_client.py's _route_for_query),
+      // surfaced here too so it's visible without digging through logs.
+      routing: pythonResult.routing || null,
     },
     { headers: { "x-request-id": requestId } }
   );
+}
+
+// Feature 2 (streaming synthesis): proxies the Python ensemble's SSE stream
+// straight through to the browser, byte for byte, while also watching each
+// event go by to capture the final "done" payload -- once the upstream
+// stream closes, the same accounting the non-streaming path does inline
+// (query history, API-key usage) runs using that captured payload instead of
+// a whole-response JSON body.
+async function handleStreamingQuery(params: {
+  prompt: string;
+  options: any;
+  requestId: string;
+  userId: string;
+  projectId: string | null;
+  apiKeyAuth: Awaited<ReturnType<typeof authenticateApiKey>>;
+}) {
+  const { prompt, options, requestId, userId, projectId, apiKeyAuth } = params;
+
+  const upstream = await streamPythonEnsemble(prompt, options, requestId);
+  if (!upstream || !upstream.body) {
+    if (userId) recordQueryError(userId, "ensemble_unavailable").catch(() => {});
+    return NextResponse.json(
+      {
+        error: "The ensemble backend is temporarily unavailable. Please try again shortly.",
+        code: "ENSEMBLE_UNAVAILABLE",
+        request_id: requestId,
+      },
+      { status: 503, headers: { "Retry-After": "30", "x-request-id": requestId } }
+    );
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let doneEvent: any = null;
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = upstream.body!.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+
+          buffer += decoder.decode(value, { stream: true });
+          let separatorIndex;
+          while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
+            const rawEvent = buffer.slice(0, separatorIndex);
+            buffer = buffer.slice(separatorIndex + 2);
+            const dataLine = rawEvent.split("\n").find((line) => line.startsWith("data:"));
+            if (!dataLine) continue;
+            try {
+              const parsed = JSON.parse(dataLine.slice(5).trim());
+              if (parsed.event === "done") doneEvent = parsed;
+            } catch {
+              // Malformed SSE line -- ignore, the client gets the raw bytes
+              // either way and can surface its own parse error if it cares.
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Streaming ensemble response interrupted:", error);
+      } finally {
+        controller.close();
+      }
+
+      if (!doneEvent) {
+        // Stream ended without ever producing a "done" event (error event,
+        // or the connection dropped) -- nothing to record.
+        return;
+      }
+
+      const metrics: any = {
+        accuracy: doneEvent.metrics?.top_score || 0,
+        latency_s: (doneEvent.metrics?.latency_ms || 0) / 1000,
+        carbon_saved_g: doneEvent.metrics?.carbon_saved_g || 0,
+        emissions_g: doneEvent.metrics?.emissions_g || 0,
+        providers_used: doneEvent.providers_used || [],
+      };
+      const estimatedCostUsd = estimateQueryCostUsd({
+        prompt,
+        candidates: doneEvent.candidates || [],
+        finalAnswer: doneEvent.answer,
+      });
+
+      if (userId) {
+        const supabase = createServerSupabaseClient();
+        const queryRecord = {
+          user_id: userId,
+          project_id: projectId,
+          prompt,
+          answer: doneEvent.answer,
+          top_provider: doneEvent.candidates?.[0]?.provider_name || "MultiLLM",
+          top_model: doneEvent.candidates?.[0]?.model || "ensemble",
+          confidence_score: metrics.accuracy,
+          latency_ms: metrics.latency_s * 1000,
+          carbon_saved: metrics.carbon_saved_g,
+          emissions: metrics.emissions_g,
+          candidates: doneEvent.candidates || [],
+          sources: doneEvent.sources || [],
+          estimated_cost_usd: estimatedCostUsd,
+        };
+        await supabase.from("queries").insert(queryRecord as any);
+      }
+
+      if (apiKeyAuth) {
+        await apiKeyAuth.recordUsage();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "x-request-id": requestId,
+    },
+  });
 }
 
 export async function GET() {

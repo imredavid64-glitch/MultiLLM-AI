@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   getClientIp: vi.fn(),
   decryptApiKey: vi.fn(),
   isDemoMode: vi.fn(),
+  insertQuery: vi.fn(),
+  getTodayProviderSpendUsd: vi.fn(),
+  recordQueryError: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/serverAuth", () => ({
@@ -27,10 +30,12 @@ vi.mock("@/lib/supabase/services", () => ({
   getApiKeys: mocks.getApiKeys,
   getClientProject: mocks.getClientProject,
   incrementApiKeyUsage: mocks.incrementApiKeyUsage,
+  getTodayProviderSpendUsd: mocks.getTodayProviderSpendUsd,
+  recordQueryError: mocks.recordQueryError,
 }));
 vi.mock("@/lib/supabase/client", () => ({
   createServerSupabaseClient: () => ({
-    from: () => ({ insert: async () => ({ data: null, error: null }) }),
+    from: () => ({ insert: mocks.insertQuery }),
   }),
 }));
 vi.mock("@/lib/rateLimiter", () => ({
@@ -79,6 +84,9 @@ describe("POST /api/query", () => {
     mocks.getClientIp.mockReturnValue("127.0.0.1");
     mocks.checkRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
     mocks.isDemoMode.mockReturnValue(false);
+    mocks.insertQuery.mockResolvedValue({ data: null, error: null });
+    mocks.getTodayProviderSpendUsd.mockResolvedValue(0);
+    mocks.recordQueryError.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -220,5 +228,131 @@ describe("POST /api/query", () => {
 
     expect(res.status).toBe(503);
     expect(mocks.consumeCredits).toHaveBeenCalledWith("user-1", 1, expect.objectContaining({ id: "user-1" }));
+  });
+
+  describe("stream: true (Feature 2)", () => {
+    function sseResponse(events: Record<string, unknown>[]) {
+      const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(body));
+            controller.close();
+          },
+        }),
+      };
+    }
+
+    it("proxies the Python ensemble's SSE endpoint instead of the JSON one", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue(
+        sseResponse([
+          { event: "status", stage: "synthesizing" },
+          { event: "done", answer: "Streamed answer.", candidates: [], sources: [], metrics: { top_score: 0.8 } },
+        ])
+      );
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await POST(postRequest({ prompt: "hello", stream: true }));
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("text/event-stream");
+      expect(fetchSpy.mock.calls[0][0]).toMatch(/\/api\/query\/stream$/);
+
+      const text = await res.text();
+      expect(text).toContain('"stage":"synthesizing"');
+      expect(text).toContain("Streamed answer.");
+    });
+
+    it("records query history and API-key usage from the final 'done' event once the stream ends", async () => {
+      const recordUsage = vi.fn().mockResolvedValue(undefined);
+      mocks.authenticateApiKey.mockResolvedValue({ userId: "user-1", tier: "pro", keyId: "key-1", recordUsage });
+      const fetchSpy = vi.fn().mockResolvedValue(
+        sseResponse([
+          {
+            event: "done",
+            answer: "Streamed answer.",
+            candidates: [{ provider_name: "Groq (OpenAI API)" }],
+            sources: [],
+            metrics: { top_score: 0.8, latency_ms: 500, carbon_saved_g: 0.1, emissions_g: 0.01 },
+            providers_used: ["Groq (OpenAI API)"],
+          },
+        ])
+      );
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await POST(postRequest({ prompt: "hello", stream: true }));
+      await res.text(); // drain the stream so the post-close accounting runs
+
+      expect(recordUsage).toHaveBeenCalled();
+      expect(mocks.insertQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ answer: "Streamed answer.", top_provider: "Groq (OpenAI API)" })
+      );
+      // Regression guard: the streaming path must cost its query the same
+      // way the non-streaming path does, or the global daily spend cap
+      // silently never sees any spend from stream:true traffic (the main
+      // homepage UI always sends stream:true).
+      const insertedRecord = mocks.insertQuery.mock.calls[0][0];
+      expect(insertedRecord.estimated_cost_usd).toBeGreaterThan(0);
+    });
+
+    it("falls back to a 503 ENSEMBLE_UNAVAILABLE response when the stream endpoint is unreachable", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")));
+
+      const res = await POST(postRequest({ prompt: "hello", stream: true }));
+      const json = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(json.code).toBe("ENSEMBLE_UNAVAILABLE");
+    });
+  });
+
+  describe("local_only (Feature 4)", () => {
+    function jsonResponse(body: Record<string, unknown>) {
+      return { ok: true, json: async () => body };
+    }
+
+    it("forwards local_only to the Python ensemble when requested per-request", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue(
+        jsonResponse({ answer: "Local answer.", candidates: [], sources: [], metrics: {} })
+      );
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await POST(postRequest({ prompt: "hello", local_only: true }));
+
+      expect(res.status).toBe(200);
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody.local_only).toBe(true);
+      // Skips BYO-key loading entirely -- nothing would use the keys.
+      expect(mocks.getApiKeys).not.toHaveBeenCalled();
+    });
+
+    it("forwards local_only when it's the user's saved profile preference, even with no per-request flag", async () => {
+      mocks.getProfile.mockResolvedValue({ ...BASE_PROFILE, local_only_mode: true });
+      const fetchSpy = vi.fn().mockResolvedValue(
+        jsonResponse({ answer: "Local answer.", candidates: [], sources: [], metrics: {} })
+      );
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await POST(postRequest({ prompt: "hello" }));
+
+      expect(res.status).toBe(200);
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody.local_only).toBe(true);
+    });
+
+    it("bypasses the daily spend cap entirely for a local-only request", async () => {
+      vi.stubEnv("DAILY_PROVIDER_SPEND_CAP_USD", "1");
+      mocks.getTodayProviderSpendUsd.mockResolvedValue(999); // would otherwise block
+      const fetchSpy = vi.fn().mockResolvedValue(
+        jsonResponse({ answer: "Local answer.", candidates: [], sources: [], metrics: {} })
+      );
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await POST(postRequest({ prompt: "hello", local_only: true }));
+
+      expect(res.status).toBe(200);
+      expect(mocks.getTodayProviderSpendUsd).not.toHaveBeenCalled();
+    });
   });
 });

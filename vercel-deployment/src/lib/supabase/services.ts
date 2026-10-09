@@ -267,6 +267,60 @@ export async function createQuery(query: Database['public']['Tables']['queries']
   return data;
 }
 
+// Today's total estimated provider spend across every account combined
+// (UTC day boundary) -- backs the global daily spend cap check in
+// src/app/api/query/route.ts. Computed in Postgres (get_today_provider_spend_usd,
+// see supabase/schema.sql) rather than summed client-side, so this stays one
+// cheap round trip regardless of how many queries ran today.
+export async function getTodayProviderSpendUsd(): Promise<number> {
+  const { data, error } = await supabaseServer.rpc('get_today_provider_spend_usd');
+  if (error || typeof data !== 'number') return 0;
+  return data;
+}
+
+// Accounts whose plan_expires_at falls exactly 3 days from now (a 24h-wide
+// window so a daily cron catches each account on the one day it crosses that
+// mark) -- used by the plan-expiring cron route. Scoped to is_active so a
+// revoked demo account (see scripts/demo-account.mjs) doesn't get a renewal
+// nudge after being deliberately cut off.
+export async function getProfilesWithPlanExpiringSoon(daysAhead: number): Promise<Profile[]> {
+  const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const windowStart = new Date(now + daysAhead * DAY_MS).toISOString();
+  const windowEnd = new Date(now + (daysAhead + 1) * DAY_MS).toISOString();
+  const { data, error } = await supabaseServer
+    .from('profiles')
+    .select('*')
+    .eq('is_active', true)
+    .gte('plan_expires_at', windowStart)
+    .lt('plan_expires_at', windowEnd);
+  if (error) return [];
+  return data;
+}
+
+// Claims the right to send one lifecycle email for (userId, emailType,
+// periodKey) -- see supabase/schema.sql's sent_emails table. Returns true
+// only for the caller that successfully claims it (insert succeeds); a
+// second call for the same triple gets back false because the unique
+// constraint rejects it, which is what actually prevents a duplicate send
+// under concurrent requests (not a prior SELECT-then-insert, which would
+// have the same race as the old credits decrement did).
+export async function tryClaimLifecycleEmail(userId: string, emailType: string, periodKey: string): Promise<boolean> {
+  const { error } = await supabaseServer.from('sent_emails').insert({ user_id: userId, email_type: emailType, period_key: periodKey });
+  if (!error) return true;
+  // 23505 = unique_violation (Postgres) -- already sent for this period, not
+  // a real failure.
+  return false;
+}
+
+// Records a failed query attempt (ensemble unavailable, no remote provider
+// answered, etc.) so scripts/usage-report.mjs can report real per-account
+// error counts. Best-effort: a failure here should never surface as the
+// user-facing error for the query that's already failing for its own reason.
+export async function recordQueryError(userId: string, reason: string): Promise<void> {
+  await supabaseServer.from('query_errors').insert({ user_id: userId, reason } satisfies Database['public']['Tables']['query_errors']['Insert']);
+}
+
 export async function getQueries(userId: string, limit = 50, offset = 0): Promise<Query[]> {
   const { data, error } = await supabaseServer
     .from('queries')
