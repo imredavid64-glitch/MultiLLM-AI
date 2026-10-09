@@ -13,6 +13,7 @@ export interface Database {
           credits_period_start: string;
           plan_expires_at: string | null;
           is_active: boolean;
+          local_only_mode: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -25,6 +26,7 @@ export interface Database {
           credits_period_start?: string;
           plan_expires_at?: string | null;
           is_active?: boolean;
+          local_only_mode?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -37,6 +39,7 @@ export interface Database {
           credits_period_start?: string;
           plan_expires_at?: string | null;
           is_active?: boolean;
+          local_only_mode?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -94,6 +97,7 @@ export interface Database {
           emissions: number;
           candidates: Json | null;
           sources: Json | null;
+          estimated_cost_usd: number;
           created_at: string;
         };
         Insert: {
@@ -110,6 +114,7 @@ export interface Database {
           emissions: number;
           candidates?: Json | null;
           sources?: Json | null;
+          estimated_cost_usd?: number;
           created_at?: string;
         };
         Update: {
@@ -126,6 +131,7 @@ export interface Database {
           emissions?: number;
           candidates?: Json | null;
           sources?: Json | null;
+          estimated_cost_usd?: number;
           created_at?: string;
         };
       };
@@ -288,6 +294,49 @@ export interface Database {
           usage_count?: number;
           last_used_at?: string | null;
           created_at?: string;
+        };
+      };
+      query_errors: {
+        Row: {
+          id: string;
+          user_id: string;
+          reason: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          reason: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          reason?: string;
+          created_at?: string;
+        };
+      };
+      sent_emails: {
+        Row: {
+          id: string;
+          user_id: string;
+          email_type: 'welcome' | 'low_credits' | 'plan_expiring';
+          period_key: string;
+          sent_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          email_type: 'welcome' | 'low_credits' | 'plan_expiring';
+          period_key: string;
+          sent_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          email_type?: 'welcome' | 'low_credits' | 'plan_expiring';
+          period_key?: string;
+          sent_at?: string;
         };
       };
     };

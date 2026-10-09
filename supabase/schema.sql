@@ -96,6 +96,12 @@ ALTER TABLE public.training_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ
 -- enrolled starting today instead of resetting on an unknown past date.
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS credits_period_start TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
+-- Feature 4 (local-only mode): a per-user preference, persisted here so it
+-- survives across sessions/devices for a logged-in user. An anonymous
+-- visitor's choice lives in localStorage instead (see page.tsx) since there's
+-- no profile row to attach it to.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS local_only_mode BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Subscriptions (Stripe)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -333,6 +339,72 @@ CREATE TRIGGER update_client_projects_updated_at
 -- to belong to one).
 ALTER TABLE public.queries ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES public.client_projects(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_queries_project_id ON public.queries(project_id);
+
+-- Estimated provider cost for this query (see src/lib/providerPricing.ts),
+-- computed and written by the /api/query route at insert time. "Estimated"
+-- because it's derived from a cheap ~4-chars/token heuristic and a
+-- manually-maintained price table, not a provider's actual billed amount --
+-- same honesty-about-precision convention as carbon_saved/emissions above.
+ALTER TABLE public.queries ADD COLUMN IF NOT EXISTS estimated_cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- Supports both the global daily spend cap's "sum today's cost across every
+-- user" scan (get_today_provider_spend_usd below) and scripts/usage-report.mjs's
+-- per-account 7/30-day window scans.
+CREATE INDEX IF NOT EXISTS idx_queries_created_at ON public.queries(created_at);
+
+-- Returns today's total estimated provider spend across all accounts
+-- combined (UTC day boundary) -- used by the daily spend cap check in
+-- src/app/api/query/route.ts before calling any paid provider. A SQL
+-- function (not a plain client-side SELECT+sum) so the aggregate runs in
+-- Postgres rather than pulling every row over the wire on every query.
+CREATE OR REPLACE FUNCTION public.get_today_provider_spend_usd()
+RETURNS double precision AS $$
+    SELECT COALESCE(SUM(estimated_cost_usd), 0)::double precision
+      FROM public.queries
+     WHERE created_at >= date_trunc('day', now());
+$$ LANGUAGE sql STABLE SET search_path = public, pg_temp;
+REVOKE ALL ON FUNCTION public.get_today_provider_spend_usd() FROM PUBLIC, anon, authenticated;
+
+-- Records a failed query attempt (ensemble unavailable, no remote provider
+-- answered, etc.) so scripts/usage-report.mjs can report real per-account
+-- error counts -- previously a failed query left no row anywhere. Written
+-- only by the backend's service-role client, same as queries/platform_api_keys.
+CREATE TABLE IF NOT EXISTS public.query_errors (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_query_errors_user_created ON public.query_errors(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_query_errors_created_at ON public.query_errors(created_at);
+
+ALTER TABLE public.query_errors ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own query errors" ON public.query_errors;
+CREATE POLICY "Users can view own query errors" ON public.query_errors
+    FOR SELECT USING ((SELECT auth.uid()) = user_id);
+
+-- Dedupe log for lifecycle emails (see src/lib/email.ts, lifecycleEmails.ts):
+-- the UNIQUE constraint below -- not a prior SELECT check -- is what actually
+-- prevents sending the same email twice under concurrent requests. period_key
+-- scopes "once per X": 'once' for welcome, the credit period's
+-- credits_period_start for low_credits (so it can fire again next period),
+-- and plan_expires_at's own value for plan_expiring (fixed per account, so
+-- a daily cron re-scanning the same account can't resend it). No public RLS
+-- policy -- only the backend's service-role client ever reads/writes this.
+CREATE TABLE IF NOT EXISTS public.sent_emails (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    email_type TEXT NOT NULL CHECK (email_type IN ('welcome', 'low_credits', 'plan_expiring')),
+    period_key TEXT NOT NULL,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, email_type, period_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sent_emails_user_id ON public.sent_emails(user_id);
+
+ALTER TABLE public.sent_emails ENABLE ROW LEVEL SECURITY;
 
 -- Storage buckets (run in Supabase Dashboard > Storage)
 -- INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
