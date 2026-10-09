@@ -13,6 +13,7 @@ interface Profile {
   credits: number;
   plan_expires_at: string | null;
   is_active: boolean;
+  local_only_mode: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,7 @@ function demoUser(email: string, name: string): User & { profile: Profile } {
       credits: 10000,
       plan_expires_at: null,
       is_active: true,
+      local_only_mode: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
@@ -121,6 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
         setUser({ ...session.user, profile: profile || undefined });
+        // Fire-and-forget: deduped server-side (sent_emails), safe to call
+        // on every session resolution, not just a true "first" login.
+        fetch("/api/account", { method: "POST" }).catch(() => {});
       } else {
         setUser(null);
       }
