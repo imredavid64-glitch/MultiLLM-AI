@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import os
+import queue
 import re
 import threading
 import time
@@ -499,13 +500,68 @@ def _call_with_timeout(fn: Any, timeout_seconds: float, *args: Any, **kwargs: An
     forcibly kill a running thread, so a call that exceeds the timeout keeps
     running in the background -- this bounds how long THIS request waits on
     it, not the underlying network call itself. Raises plain TimeoutError
-    (classify_failure below checks for exactly that) on expiry."""
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    (classify_failure below checks for exactly that) on expiry.
+
+    Deliberately NOT `with ThreadPoolExecutor(...) as executor:` -- that
+    context manager's __exit__ calls shutdown(wait=True) unconditionally,
+    which blocks until the submitted call actually finishes even after
+    future.result(timeout=...) has already raised. That silently defeats the
+    whole point of this function: a provider whose retry loop takes 100s
+    still makes the caller wait the full 100s, just relabeled as a timeout
+    instead of a success. shutdown(wait=False) below returns immediately;
+    the orphaned thread keeps running until the underlying call naturally
+    finishes (or the process exits), it just no longer blocks anyone."""
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
         future = executor.submit(fn, *args, **kwargs)
         try:
             return future.result(timeout=timeout_seconds)
         except _FutureTimeoutError:
             raise TimeoutError(f"timed out after {timeout_seconds}s") from None
+    finally:
+        executor.shutdown(wait=False)
+
+
+def _iter_stream_with_timeout(iterator: Any, timeout_seconds: float) -> Any:
+    """Wraps a chat_stream() generator so a stalled connection raises
+    TimeoutError instead of hanging indefinitely. chat_stream() has no bound
+    of its own -- unlike chat(), which every call site wraps in
+    _call_with_timeout, the real token-streaming loop in
+    build_ensemble_answer_stream iterates the generator directly, and the
+    OpenAI client here is never constructed with an explicit request
+    timeout (so it falls back to the SDK's own long default).
+
+    Bounds time BETWEEN chunks, not total stream duration -- a real answer
+    that's slow because it's long must not be cut short, only a connection
+    that's stopped producing anything at all. Runs the actual iteration on a
+    background thread (daemon, so it can't block process exit) and relays
+    chunks through a queue; if the provider hangs, this raises after
+    timeout_seconds but the orphaned thread is simply abandoned, same
+    trade-off as _call_with_timeout."""
+    chunk_queue: "queue.Queue[Any]" = queue.Queue()
+    _sentinel = object()
+
+    def _produce() -> None:
+        try:
+            for chunk in iterator:
+                chunk_queue.put(chunk)
+        except Exception as exc:  # noqa: BLE001 - relayed to the consumer, not swallowed
+            chunk_queue.put(exc)
+        finally:
+            chunk_queue.put(_sentinel)
+
+    threading.Thread(target=_produce, daemon=True).start()
+
+    while True:
+        try:
+            item = chunk_queue.get(timeout=timeout_seconds)
+        except queue.Empty:
+            raise TimeoutError(f"stream stalled for more than {timeout_seconds}s") from None
+        if item is _sentinel:
+            return
+        if isinstance(item, Exception):
+            raise item
+        yield item
 
 
 def classify_failure(exc: BaseException) -> str:
@@ -1809,7 +1865,8 @@ def build_ensemble_answer_stream(
     stream_fn = getattr(synthesis_provider, "chat_stream", None)
     if stream_fn is not None:
         try:
-            for chunk in stream_fn(messages=synthesis_messages, temperature=0.1, gen_p=synthesis_gen):
+            raw_stream = stream_fn(messages=synthesis_messages, temperature=0.1, gen_p=synthesis_gen)
+            for chunk in _iter_stream_with_timeout(raw_stream, JUDGE_TIMEOUT_SECONDS):
                 if not chunk:
                     continue
                 final_answer += chunk
